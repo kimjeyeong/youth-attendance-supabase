@@ -3,7 +3,7 @@ import { WORSHIP_OPTIONS, CELL_OPTIONS } from '../config.js'
 
 const worshipClass = { 출석: 'ok', 온라인: 'on', 결석: 'no' }
 
-export default function MemberRow({ member, rec, onChange }) {
+export default function MemberRow({ member, rec, onChange, disabled = false }) {
   const [showNote, setShowNote] = useState(!!rec.note)
 
   return (
@@ -13,7 +13,7 @@ export default function MemberRow({ member, rec, onChange }) {
           {member.name}
           {member.status === '신규자' && <span className="tag new">신규</span>}
         </div>
-        <button type="button" className="notebtn" onClick={() => setShowNote((v) => !v)} title="비고" aria-label={`${member.name} 비고 입력`} aria-expanded={showNote}>
+        <button type="button" className="notebtn" disabled={disabled} onClick={() => setShowNote((v) => !v)} title="비고" aria-label={`${member.name} 비고 입력`} aria-expanded={showNote}>
           ✏️
         </button>
       </div>
@@ -24,6 +24,7 @@ export default function MemberRow({ member, rec, onChange }) {
             <button
               key={opt}
               type="button"
+              disabled={disabled}
               className={'seg ' + (rec.worship === opt ? 'active ' + worshipClass[opt] : '')}
               aria-pressed={rec.worship === opt}
               onClick={() => onChange({ worship: rec.worship === opt ? '' : opt })}
@@ -37,6 +38,7 @@ export default function MemberRow({ member, rec, onChange }) {
             <button
               key={opt}
               type="button"
+              disabled={disabled}
               className={'seg ' + (rec.cell === opt ? 'active ' + (opt === '참석' ? 'ok' : 'no') : '')}
               aria-pressed={rec.cell === opt}
               onClick={() => onChange({ cell: rec.cell === opt ? '' : opt })}
@@ -50,6 +52,7 @@ export default function MemberRow({ member, rec, onChange }) {
       {showNote && (
         <input
           className="input note"
+          disabled={disabled}
           placeholder="비고 (사유 등)"
           value={rec.note || ''}
           onChange={(e) => onChange({ note: e.target.value })}

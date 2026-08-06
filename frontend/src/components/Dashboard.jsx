@@ -6,6 +6,8 @@ export default function Dashboard({ user, groups, isAdmin }) {
   const [groupId, setGroupId] = useState(isAdmin ? '' : user.groupId) // '' = 전체
   const [members, setMembers] = useState([])
   const [records, setRecords] = useState([])
+  const [view, setView] = useState('summary')
+  const [personQuery, setPersonQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const requestId = useRef(0)
@@ -32,6 +34,19 @@ export default function Dashboard({ user, groups, isAdmin }) {
 
   const stats = useMemo(() => computeStats(members, records, groups), [members, records, groups])
   const showGroupCompare = isAdmin && !groupId
+  const personalDisabled = isAdmin && !groupId
+  const visiblePeople = useMemo(() => {
+    const query = personQuery.trim().toLocaleLowerCase('ko')
+    if (!query) return stats.people
+    return stats.people.filter((person) =>
+      `${person.name} ${person.groupName}`.toLocaleLowerCase('ko').includes(query))
+  }, [personQuery, stats.people])
+
+  function changeGroup(nextGroupId) {
+    setGroupId(nextGroupId)
+    setPersonQuery('')
+    if (!nextGroupId) setView('summary')
+  }
 
   return (
     <div className="board">
@@ -39,7 +54,7 @@ export default function Dashboard({ user, groups, isAdmin }) {
         <div className="card controls">
           <label className="field">
             <span>분석 범위</span>
-            <select className="input" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+            <select className="input" value={groupId} onChange={(e) => changeGroup(e.target.value)}>
               <option value="">전체</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
@@ -47,10 +62,55 @@ export default function Dashboard({ user, groups, isAdmin }) {
         </div>
       )}
 
+      <div className="viewtabs" role="tablist" aria-label="출석 분석 보기">
+        <button type="button" role="tab" aria-selected={view === 'summary'} className={view === 'summary' ? 'viewtab on' : 'viewtab'} onClick={() => setView('summary')}>
+          전체 요약
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'people'}
+          className={view === 'people' ? 'viewtab on' : 'viewtab'}
+          disabled={personalDisabled}
+          title={personalDisabled ? '분석 범위에서 순을 먼저 선택하세요.' : ''}
+          onClick={() => setView('people')}
+        >
+          개인별 현황
+        </button>
+      </div>
+      {personalDisabled && <div className="scopehint">개인별 현황은 분석 범위에서 특정 순을 선택하면 볼 수 있습니다.</div>}
+
       {error ? (
         <div className="card error" role="alert">{error}</div>
       ) : loading ? (
         <div className="center muted">분석 중…</div>
+      ) : view === 'people' ? (
+        <div className="card peoplecard">
+          <div className="sectionhead">
+            <div>
+              <h2>개인별 예배 출석 현황</h2>
+              <div className="muted small">최근 {stats.analysisWeeks}주 · 온라인 포함</div>
+            </div>
+            <span className="chip">{visiblePeople.length}명</span>
+          </div>
+          <label className="searchbox">
+            <span className="sr-only">이름 검색</span>
+            <input
+              type="search"
+              className="input"
+              placeholder="이름으로 검색"
+              value={personQuery}
+              onChange={(e) => setPersonQuery(e.target.value)}
+            />
+          </label>
+          {visiblePeople.length === 0 ? (
+            <div className="emptysearch muted">검색 결과가 없습니다.</div>
+          ) : (
+            <div className="peoplelist">
+              {visiblePeople.map((person) => <PersonAttendance key={person.id} person={person} />)}
+            </div>
+          )}
+        </div>
       ) : (
         <>
           {/* 요약 타일 */}
@@ -119,6 +179,32 @@ export default function Dashboard({ user, groups, isAdmin }) {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+function PersonAttendance({ person }) {
+  const statusClass = person.latestStatus === '결석' ? 'no' : person.latestStatus === '온라인' ? 'on' : 'ok'
+  return (
+    <div className="personrow">
+      <div className="personmain">
+        <div>
+          <span className="name">{person.name}</span>
+          {person.groupName && <span className="muted small persongroup">{person.groupName}</span>}
+        </div>
+        <div className="personrate">
+          {person.checked > 0 ? <><strong>{person.rate}%</strong><span>{person.attended}/{person.checked}회</span></> : <span>기록 없음</span>}
+        </div>
+      </div>
+      <div className="ratebar" aria-label={`출석률 ${person.rate}%`}>
+        <div className="ratebar-fill" style={{ width: `${person.rate}%` }} />
+      </div>
+      <div className="personmeta">
+        <span>현장 {person.inPerson}</span>
+        <span>온라인 {person.online}</span>
+        <span>결석 {person.absent}</span>
+        {person.latestStatus && <span className={`chip ${statusClass}`}>최근 {person.latestStatus}</span>}
+      </div>
     </div>
   )
 }

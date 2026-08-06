@@ -25,6 +25,7 @@ export default function AttendanceBoard({ user, groups, isAdmin, onDirtyChange }
   const [msg, setMsg] = useState('')
   const [saveOk, setSaveOk] = useState(true)
   const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
   const [dirtyIds, setDirtyIds] = useState(() => new Set())
   const requestId = useRef(0)
 
@@ -104,6 +105,11 @@ export default function AttendanceBoard({ user, groups, isAdmin, onDirtyChange }
   }, [members, records])
 
   const groupName = groups.find((g) => g.id === groupId)?.name || ''
+  const visibleMembers = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase('ko')
+    if (!normalized) return members
+    return members.filter((member) => member.name.toLocaleLowerCase('ko').includes(normalized))
+  }, [members, query])
 
   return (
     <div className="board">
@@ -136,16 +142,32 @@ export default function AttendanceBoard({ user, groups, isAdmin, onDirtyChange }
         {summary.미체크 > 0 && <span className="chip muted">미체크 {summary.미체크}</span>}
       </div>
 
+      <div className="searchcard card">
+        <label className="searchbox">
+          <span className="sr-only">출석 명단 검색</span>
+          <input type="search" className="input" placeholder="이름으로 명단 검색" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </label>
+        {query && <span className="chip">{visibleMembers.length}명</span>}
+      </div>
+
       {error ? (
         <div className="card error" role="alert">{error}</div>
       ) : loading ? (
         <div className="center muted">불러오는 중…</div>
       ) : members.length === 0 ? (
         <div className="center muted">명단이 없습니다.</div>
+      ) : visibleMembers.length === 0 ? (
+        <div className="card emptysearch muted">검색 결과가 없습니다.</div>
       ) : (
         <div className="list">
-          {members.map((m) => (
-            <MemberRow key={m.id} member={m} rec={records[m.id] || {}} onChange={(p) => setRec(m.id, p)} />
+          {visibleMembers.map((m) => (
+            <MemberRow
+              key={m.id}
+              member={m}
+              rec={records[m.id] || {}}
+              disabled={saving}
+              onChange={(p) => setRec(m.id, p)}
+            />
           ))}
         </div>
       )}

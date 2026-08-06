@@ -74,8 +74,48 @@ export function computeStats(members, records, groups) {
     .sort((a, b) => b.absent - a.absent)
     .slice(0, 12)
 
+  const analysisDates = new Set(allDates.slice(-12))
+  const peopleById = {}
+  members.forEach((m) => {
+    peopleById[String(m.id)] = {
+      id: m.id,
+      name: m.name,
+      groupName: groupName[m.groupId] || m.groupId || '',
+      attended: 0,
+      inPerson: 0,
+      online: 0,
+      absent: 0,
+      checked: 0,
+      latestDate: '',
+      latestStatus: '',
+    }
+  })
+  records.forEach((r) => {
+    if (!analysisDates.has(r.date) || !validWorship.has(r.worship)) return
+    const person = peopleById[String(r.memberId)]
+    if (!person) return
+    person.checked++
+    if (r.worship === '출석') {
+      person.attended++
+      person.inPerson++
+    } else if (r.worship === '온라인') {
+      person.attended++
+      person.online++
+    } else {
+      person.absent++
+    }
+    if (!person.latestDate || r.date > person.latestDate) {
+      person.latestDate = r.date
+      person.latestStatus = r.worship
+    }
+  })
+  const people = Object.values(peopleById)
+    .map((person) => ({ ...person, rate: pct(person.attended, person.checked) }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+
   return {
     total, newbies, weekly, byGroup, absentees, recentWeeks,
+    people, analysisWeeks: analysisDates.size,
     latestRate, latestPresent, latestTotal,
     cellRate, cellPresent, cellTotal,
   }

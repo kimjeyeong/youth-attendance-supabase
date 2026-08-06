@@ -76,3 +76,65 @@ test('코드를 재발급하면 이전 코드는 무효가 된다', async () => 
   assert.equal((await mockApi.login({ code: oldCode })).ok, false)
   assert.equal((await mockApi.login({ code: re.code })).ok, true)
 })
+
+test('새순·새내기순은 여러 순장을 개별 계정으로 관리한다', async () => {
+  const first = await mockApi.setLeader({ code: 'admin-1488', groupId: 'S2', memberId: 3 })
+  const second = await mockApi.setLeader({ code: 'admin-1488', groupId: 'S2', memberId: 4 })
+  assert.equal(first.ok, true)
+  assert.equal(second.ok, true)
+  assert.notEqual(first.userId, second.userId)
+  assert.equal((await mockApi.login({ code: first.code })).ok, true)
+  assert.equal((await mockApi.login({ code: second.code })).ok, true)
+
+  const list = await mockApi.getLeaders({ code: 'admin-1488' })
+  const specialGroup = list.leaders.find((group) => group.groupId === 'S2')
+  assert.equal(specialGroup.multiple, true)
+  assert.ok(specialGroup.leaders.some((leader) => leader.memberId === '3'))
+  assert.ok(specialGroup.leaders.some((leader) => leader.memberId === '4'))
+
+  const cleared = await mockApi.clearLeader({
+    code: 'admin-1488',
+    groupId: 'S2',
+    memberId: first.memberId,
+    userId: first.userId,
+  })
+  assert.equal(cleared.ok, true)
+  assert.equal((await mockApi.login({ code: first.code })).ok, false)
+  assert.equal((await mockApi.login({ code: second.code })).ok, true)
+})
+
+test('일반 순의 순장이 바뀌면 이전 로그인 코드를 폐기한다', async () => {
+  const before = await mockApi.getLeaders({ code: 'admin-1488' })
+  const oldCode = before.leaders.find((group) => group.groupId === 'G2').code
+  const changed = await mockApi.setLeader({ code: 'admin-1488', groupId: 'G2', memberId: 8 })
+
+  assert.equal(changed.ok, true)
+  assert.equal(changed.codeChanged, true)
+  assert.notEqual(changed.code, oldCode)
+  assert.equal((await mockApi.login({ code: oldCode })).ok, false)
+  assert.equal((await mockApi.login({ code: changed.code })).ok, true)
+})
+
+test('순원 리뉴얼은 현재 소속과 순이름만 바꾸고 과거 출석의 당시 순은 보존한다', async () => {
+  const denied = await mockApi.renewMembers({
+    code: 'new-0000',
+    assignments: [{ memberId: 7, groupId: 'G1' }],
+  })
+  assert.equal(denied.ok, false)
+
+  const renewed = await mockApi.renewMembers({
+    code: 'admin-1488',
+    assignments: [{ memberId: 7, groupId: 'G1' }],
+  })
+  assert.equal(renewed.ok, true)
+  assert.equal(renewed.moved, 1)
+
+  const members = await mockApi.getMembers({ code: 'admin-1488', groupId: 'G1' })
+  const member = members.members.find((item) => String(item.id) === '7')
+  assert.equal(member.groupId, 'G1')
+  assert.equal(member.groupName, '기쁨순')
+
+  const history = await mockApi.getAttendanceRange({ code: 'admin-1488', groupId: 'G1' })
+  const oldRecord = history.records.find((record) => String(record.memberId) === '7')
+  assert.equal(oldRecord.groupId, 'G2')
+})

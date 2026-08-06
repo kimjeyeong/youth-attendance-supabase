@@ -15,13 +15,13 @@ export function clearCode() { localStorage.removeItem(CODE_KEY) }
 export async function call(action, payload = {}, accessCode = getCode()) {
   const body = { ...payload, action, code: accessCode }
 
-  if (MOCK) {
-    const fn = mockApi[action]
-    if (!fn) return { ok: false, error: 'mock: 알 수 없는 action ' + action }
-    return fn(body)
-  }
-
   try {
+    if (MOCK) {
+      const fn = mockApi[action]
+      if (!fn) return { ok: false, error: 'mock: 알 수 없는 action ' + action }
+      return await fn(body)
+    }
+
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -33,6 +33,6 @@ export async function call(action, payload = {}, accessCode = getCode()) {
     }
     return data
   } catch (err) {
-    return { ok: false, error: '네트워크 오류: ' + err.message }
+    return { ok: false, error: '요청 처리 오류: ' + (err?.message || String(err)) }
   }
 }

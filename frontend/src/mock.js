@@ -7,26 +7,26 @@ const groups = [
 ]
 
 const users = [
-  { code: 'g1-0000', name: '기쁨순장', role: '순장', groupId: 'G1' },
-  { code: 'g2-5012', name: '소망순장', role: '순장', groupId: 'G2' },
-  { code: 'new-0000', name: '새순순장', role: '순장', groupId: 'S1' },
-  { code: 'rookie-0000', name: '새내기순장', role: '순장', groupId: 'S2' },
-  { code: 'admin-1488', name: '예시 관리자', role: '최고권한', groupId: '전체' },
+  { userId: 'u1', code: 'g1-0000', name: '기쁨순장', role: '순장', groupId: 'G1' },
+  { userId: 'u2', code: 'g2-5012', name: '소망순장', role: '순장', groupId: 'G2' },
+  { userId: 'u3', code: 'new-0000', name: '새순순장', role: '순장', groupId: 'S1' },
+  { userId: 'u4', code: 'rookie-0000', name: '새내기순장', role: '순장', groupId: 'S2' },
+  { userId: 'u5', code: 'admin-1488', name: '예시 관리자', role: '최고권한', groupId: '전체' },
 ]
 
 const members = [
-  { id: 1, name: '기쁨순장', groupId: 'G1', status: '정착', contact: '', note: '순장' },
-  { id: 2, name: '예시청년 1', groupId: 'G1', status: '정착', contact: '', note: '' },
-  { id: 3, name: '예시청년 2', groupId: 'G1', status: '정착', contact: '', note: '' },
-  { id: 4, name: '예시청년 3', groupId: 'G1', status: '정착', contact: '', note: '' },
-  { id: 5, name: '소망순장', groupId: 'G2', status: '정착', contact: '', note: '순장' },
-  { id: 6, name: '예시청년 4', groupId: 'G2', status: '정착', contact: '', note: '' },
-  { id: 7, name: '예시청년 5', groupId: 'G2', status: '정착', contact: '', note: '' },
-  { id: 8, name: '예시청년 6', groupId: 'G2', status: '정착', contact: '', note: '' },
-  { id: 9, name: '새순순장', groupId: 'S1', status: '정착', contact: '', note: '순장' },
-  { id: 10, name: '새가족 예시', groupId: 'S1', status: '신규자', contact: '', note: '초신자' },
-  { id: 11, name: '새내기순장', groupId: 'S2', status: '정착', contact: '', note: '순장' },
-  { id: 12, name: '진급자 예시', groupId: 'S2', status: '신규자', contact: '', note: '고등부 진급' },
+  { id: 1, name: '기쁨순장', groupId: 'G1', status: '정착', note: '순장' },
+  { id: 2, name: '예시청년 1', groupId: 'G1', status: '정착', note: '' },
+  { id: 3, name: '예시청년 2', groupId: 'G1', status: '정착', note: '' },
+  { id: 4, name: '예시청년 3', groupId: 'G1', status: '정착', note: '' },
+  { id: 5, name: '소망순장', groupId: 'G2', status: '정착', note: '순장' },
+  { id: 6, name: '예시청년 4', groupId: 'G2', status: '정착', note: '' },
+  { id: 7, name: '예시청년 5', groupId: 'G2', status: '정착', note: '' },
+  { id: 8, name: '예시청년 6', groupId: 'G2', status: '정착', note: '' },
+  { id: 9, name: '새순순장', groupId: 'S1', status: '정착', note: '순장' },
+  { id: 10, name: '새가족 예시', groupId: 'S1', status: '신규자', note: '초신자' },
+  { id: 11, name: '새내기순장', groupId: 'S2', status: '정착', note: '순장' },
+  { id: 12, name: '진급자 예시', groupId: 'S2', status: '신규자', note: '고등부 진급' },
 ]
 
 const history = []
@@ -50,6 +50,16 @@ function fail(error) { return Promise.resolve({ ok: false, error }) }
 // 해제된(비활성) 계정은 로그인할 수 없다 — 백엔드 authUser 와 동일한 규칙
 function userFor(code) { return users.find((user) => user.code === code && user.active !== false) }
 function scopeFor(user, groupId) { return user.role === '최고권한' ? (groupId || null) : user.groupId }
+function isMultiLeaderGroup(group) { return group && (group.type === '새순' || group.type === '새내기') }
+function leaderIdsFor(group) {
+  const ids = Array.isArray(group.leaderIds) ? group.leaderIds : (group.leaderId ? [group.leaderId] : [])
+  return ids.map(String)
+}
+function setLeaderIds(group, ids) {
+  group.leaderIds = [...new Set(ids.map(String))]
+  group.leaderId = group.leaderIds[0] || ''
+}
+function accountUserId(groupId, memberId) { return `leader-${memberId}-${groupId}` }
 function scopedMembers(user, groupId) {
   const scope = scopeFor(user, groupId)
   return members.filter((member) => member.status !== '비활성' && (!scope || member.groupId === scope))
@@ -68,7 +78,10 @@ export const mockApi = {
   getMembers({ code, groupId }) {
     const user = userFor(code)
     if (!user) return fail('유효하지 않은 액세스 코드입니다.')
-    return ok({ members: scopedMembers(user, groupId) })
+    return ok({ members: scopedMembers(user, groupId).map((member) => ({
+      ...member,
+      groupName: groups.find((group) => group.id === member.groupId)?.name || '',
+    })) })
   },
   getAttendance({ code, date, groupId }) {
     const user = userFor(code)
@@ -102,7 +115,7 @@ export const mockApi = {
     })
     return ok({ saved: records.length })
   },
-  addMember({ code, name, contact, type }) {
+  addMember({ code, name, type }) {
     const user = userFor(code)
     if (!user) return fail('유효하지 않은 액세스 코드입니다.')
     if (type !== '초신자' && type !== '진급자') return fail('신규자 유형이 올바르지 않습니다.')
@@ -110,7 +123,7 @@ export const mockApi = {
     const group = groups.find((item) => item.type === targetType)
     if (user.role !== '최고권한' && user.groupId !== group.id) return fail('이 유형의 신규자를 등록할 권한이 없습니다.')
     const id = Math.max(...members.map((member) => Number(member.id))) + 1
-    members.push({ id, name: String(name).trim(), groupId: group.id, status: '신규자', contact: String(contact || '').trim(), note: type })
+    members.push({ id, name: String(name).trim(), groupId: group.id, status: '신규자', note: type })
     return ok({ id, groupId: group.id })
   },
   getLeaders({ code }) {
@@ -118,16 +131,32 @@ export const mockApi = {
     if (!user || user.role !== '최고권한') return fail('최고권한만 조회할 수 있습니다.')
     return ok({
       leaders: groups.map((group) => {
-        const account = users.find((item) => item.role === '순장' && item.groupId === group.id)
-        const leader = members.find((item) => String(item.id) === String(group.leaderId))
+        const accounts = users.filter((item) => item.role === '순장' && item.groupId === group.id)
+        const used = new Set()
+        const leaders = leaderIdsFor(group).map((memberId) => {
+          const member = members.find((item) => String(item.id) === memberId)
+          const account = accounts.find((item) => item.userId === accountUserId(group.id, memberId))
+            || accounts.find((item) => !used.has(item.userId) && item.name === member?.name)
+          if (account) used.add(account.userId)
+          return {
+            memberId,
+            userId: account?.userId || '',
+            name: member?.name || account?.name || '',
+            code: account?.code || '',
+            active: account ? account.active !== false : false,
+          }
+        })
+        const first = leaders[0] || {}
         return {
           groupId: group.id,
           groupName: group.name,
           type: group.type,
-          leaderId: group.leaderId ? String(group.leaderId) : '',
-          leaderName: leader ? leader.name : '',
-          code: account ? account.code : '',
-          active: account ? account.active !== false : false,
+          multiple: isMultiLeaderGroup(group),
+          leaders,
+          leaderId: first.memberId || '',
+          leaderName: first.name || '',
+          code: first.code || '',
+          active: first.active || false,
         }
       }),
     })
@@ -139,30 +168,51 @@ export const mockApi = {
     const member = members.find((item) => String(item.id) === String(memberId))
     if (!group) return fail('해당 순을 찾을 수 없습니다.')
     if (!member) return fail('해당 구성원을 찾을 수 없습니다.')
-    group.leaderId = member.id
-    const existing = users.find((item) => item.role === '순장' && item.groupId === groupId)
+    const previousLeaderId = leaderIdsFor(group)[0] || ''
+    const nextIds = isMultiLeaderGroup(group)
+      ? [...leaderIdsFor(group), String(member.id)]
+      : [String(member.id)]
+    setLeaderIds(group, nextIds)
+    const accounts = users.filter((item) => item.role === '순장' && item.groupId === groupId)
+    const stableUserId = accountUserId(groupId, member.id)
+    const existing = isMultiLeaderGroup(group)
+      ? accounts.find((item) => item.userId === stableUserId || item.name === member.name)
+      : accounts[0]
     if (existing) {
       existing.name = member.name
       existing.active = true
-      return ok({ code: existing.code, leaderName: member.name, isNew: false })
+      const codeChanged = !isMultiLeaderGroup(group) && previousLeaderId !== String(member.id)
+      if (codeChanged) existing.code = `${groupId.toLowerCase()}-${Math.random().toString(36).slice(2, 6)}`
+      return ok({ code: existing.code, leaderName: member.name, memberId: String(member.id), userId: existing.userId, isNew: false, codeChanged })
     }
     const newCode = `${groupId.toLowerCase()}-${Math.random().toString(36).slice(2, 6)}`
-    users.push({ code: newCode, name: member.name, role: '순장', groupId, active: true })
-    return ok({ code: newCode, leaderName: member.name, isNew: true })
+    users.push({ userId: stableUserId, code: newCode, name: member.name, role: '순장', groupId, active: true })
+    return ok({ code: newCode, leaderName: member.name, memberId: String(member.id), userId: stableUserId, isNew: true })
   },
-  clearLeader({ code, groupId }) {
+  clearLeader({ code, groupId, memberId, userId }) {
     const user = userFor(code)
     if (!user || user.role !== '최고권한') return fail('최고권한만 순장을 해제할 수 있습니다.')
     const group = groups.find((item) => item.id === groupId)
-    if (group) group.leaderId = ''
-    const account = users.find((item) => item.role === '순장' && item.groupId === groupId)
-    if (account) account.active = false
+    if (!group) return fail('해당 순을 찾을 수 없습니다.')
+    const accounts = users.filter((item) => item.role === '순장' && item.groupId === groupId)
+    if (isMultiLeaderGroup(group)) {
+      if (!memberId && !userId) return fail('해제할 순장을 지정하세요.')
+      setLeaderIds(group, leaderIdsFor(group).filter((id) => id !== String(memberId || '')))
+      const account = accounts.find((item) => item.userId === userId)
+        || accounts.find((item) => item.userId === accountUserId(groupId, memberId))
+      if (account) account.active = false
+    } else {
+      setLeaderIds(group, [])
+      accounts.forEach((account) => { account.active = false })
+    }
     return ok()
   },
-  regenerateCode({ code, groupId }) {
+  regenerateCode({ code, groupId, userId }) {
     const user = userFor(code)
     if (!user || user.role !== '최고권한') return fail('최고권한만 코드를 재발급할 수 있습니다.')
-    const account = users.find((item) => item.role === '순장' && item.groupId === groupId)
+    const group = groups.find((item) => item.id === groupId)
+    const accounts = users.filter((item) => item.role === '순장' && item.groupId === groupId)
+    const account = isMultiLeaderGroup(group) ? accounts.find((item) => item.userId === userId) : accounts[0]
     if (!account) return fail('먼저 순장을 지정하세요.')
     account.code = `${groupId.toLowerCase()}-${Math.random().toString(36).slice(2, 6)}`
     account.active = true
@@ -178,5 +228,37 @@ export const mockApi = {
     member.groupId = groupId
     member.status = '정착'
     return ok()
+  },
+  syncMemberGroupNames({ code }) {
+    const user = userFor(code)
+    if (!user || user.role !== '최고권한') return fail('최고권한만 순이름을 동기화할 수 있습니다.')
+    return ok({ updated: members.length })
+  },
+  renewMembers({ code, assignments }) {
+    const user = userFor(code)
+    if (!user || user.role !== '최고권한') return fail('최고권한만 순원을 재배정할 수 있습니다.')
+    if (!Array.isArray(assignments) || assignments.length === 0) return fail('변경할 순원을 선택하세요.')
+    const seen = new Set()
+    const changes = []
+    for (const assignment of assignments) {
+      const member = members.find((item) => String(item.id) === String(assignment.memberId))
+      const group = groups.find((item) => item.id === assignment.groupId)
+      if (!member || !group || seen.has(String(assignment.memberId)) || member.status === '비활성') {
+        return fail('중복되거나 올바르지 않은 재배정 항목이 있습니다.')
+      }
+      seen.add(String(assignment.memberId))
+      if (member.groupId !== group.id) changes.push({ member, group })
+    }
+    if (changes.length === 0) return fail('실제로 변경되는 순원이 없습니다.')
+    let settled = 0
+    changes.forEach(({ member, group }) => {
+      member.groupId = group.id
+      member.groupName = group.name
+      if (member.status === '신규자' && group.type === '일반') {
+        member.status = '정착'
+        settled++
+      }
+    })
+    return ok({ moved: changes.length, settled })
   },
 }

@@ -13,7 +13,6 @@ export default function NewMember({ user, groups, isAdmin }) {
   if (canRookie) allowed.push('진급자')
 
   const [name, setName] = useState('')
-  const [contact, setContact] = useState('')
   const [type, setType] = useState(allowed[0] || '초신자')
   const [msg, setMsg] = useState('')
   const [msgOk, setMsgOk] = useState(true)
@@ -36,14 +35,16 @@ export default function NewMember({ user, groups, isAdmin }) {
 
   async function register(e) {
     e.preventDefault()
-    if (!name.trim()) return
+    const submittedName = name.trim()
+    const submittedType = type
+    if (!submittedName) return
     setSaving(true); setMsg('')
-    const res = await call('addMember', { name: name.trim(), contact, type })
+    const res = await call('addMember', { name: submittedName, type: submittedType })
     setSaving(false)
     if (res.ok) {
       setMsgOk(true)
-      setMsg(`${name} 등록 완료 (${type === '진급자' ? '새내기순' : '새 순'})`)
-      setName(''); setContact('')
+      setMsg(`${submittedName} 등록 완료 (${submittedType === '진급자' ? '새내기순' : '새 순'})`)
+      setName('')
       loadNewbies()
     } else { setMsgOk(false); setMsg('등록 실패: ' + (res.error || '알 수 없는 오류')) }
   }
@@ -68,18 +69,17 @@ export default function NewMember({ user, groups, isAdmin }) {
         <h2>신규자 등록</h2>
         <div className="seg2">
           {canNewbie && (
-            <button type="button" className={'seg ' + (type === '초신자' ? 'active ok' : '')} onClick={() => setType('초신자')}>
+            <button type="button" disabled={saving} className={'seg ' + (type === '초신자' ? 'active ok' : '')} onClick={() => setType('초신자')}>
               초신자 → 새 순
             </button>
           )}
           {canRookie && (
-            <button type="button" className={'seg ' + (type === '진급자' ? 'active ok' : '')} onClick={() => setType('진급자')}>
+            <button type="button" disabled={saving} className={'seg ' + (type === '진급자' ? 'active ok' : '')} onClick={() => setType('진급자')}>
               고등부 진급 → 새내기순
             </button>
           )}
         </div>
-        <input className="input" placeholder="이름" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className="input" placeholder="연락처 (선택)" value={contact} onChange={(e) => setContact(e.target.value)} />
+        <input className="input" placeholder="이름" maxLength={50} disabled={saving} value={name} onChange={(e) => setName(e.target.value)} />
         <button className="btn primary" disabled={saving}>{saving ? '등록 중…' : '등록'}</button>
         {msg && <div className={msgOk ? 'savemsg formmsg' : 'savemsg formmsg error'} role="status">{msg}</div>}
       </form>

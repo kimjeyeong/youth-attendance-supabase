@@ -5,7 +5,7 @@ import Login from './components/Login.jsx'
 import AttendanceBoard from './components/AttendanceBoard.jsx'
 import NewMember from './components/NewMember.jsx'
 import Dashboard from './components/Dashboard.jsx'
-import LeaderAdmin from './components/LeaderAdmin.jsx'
+import RenewalAdmin from './components/RenewalAdmin.jsx'
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -13,6 +13,7 @@ export default function App() {
   const [tab, setTab] = useState('attendance') // attendance | new
   const [booting, setBooting] = useState(true)
   const [attendanceDirty, setAttendanceDirty] = useState(false)
+  const [renewalDirty, setRenewalDirty] = useState(false)
 
   // 저장된 코드로 자동 로그인 시도
   useEffect(() => {
@@ -30,16 +31,20 @@ export default function App() {
     setGroups(res.groups || [])
   }
   function logout() {
-    if (attendanceDirty && !window.confirm('저장하지 않은 출석 변경사항이 있습니다. 로그아웃할까요?')) return
+    if ((attendanceDirty || renewalDirty) && !window.confirm('저장하지 않은 변경사항이 있습니다. 로그아웃할까요?')) return
     clearCode()
     setUser(null)
     setTab('attendance')
     setAttendanceDirty(false)
+    setRenewalDirty(false)
   }
   function changeTab(nextTab) {
     if (tab === 'attendance' && nextTab !== 'attendance' && attendanceDirty
         && !window.confirm('저장하지 않은 출석 변경사항이 있습니다. 다른 화면으로 이동할까요?')) return
+    if (tab === 'renewal' && nextTab !== 'renewal' && renewalDirty
+        && !window.confirm('저장하지 않은 순원 재배정이 있습니다. 다른 화면으로 이동할까요?')) return
     setAttendanceDirty(false)
+    setRenewalDirty(false)
     setTab(nextTab)
   }
 
@@ -52,7 +57,7 @@ export default function App() {
   const newbieGid = groups.find((g) => g.type === '새순')?.id
   const rookieGid = groups.find((g) => g.type === '새내기')?.id
   const canSeeNew = isAdmin || user.groupId === newbieGid || user.groupId === rookieGid
-  const allowed = { attendance: true, dashboard: true, new: canSeeNew, leaders: isAdmin }
+  const allowed = { attendance: true, dashboard: true, new: canSeeNew, renewal: isAdmin }
   const activeTab = allowed[tab] ? tab : 'attendance'
 
   return (
@@ -81,8 +86,8 @@ export default function App() {
           </button>
         )}
         {isAdmin && (
-          <button className={activeTab === 'leaders' ? 'tab on' : 'tab'} onClick={() => changeTab('leaders')}>
-            순장
+          <button className={activeTab === 'renewal' ? 'tab on' : 'tab'} onClick={() => changeTab('renewal')}>
+            리뉴얼
           </button>
         )}
       </nav>
@@ -91,7 +96,7 @@ export default function App() {
         {activeTab === 'attendance' && <AttendanceBoard user={user} groups={groups} isAdmin={isAdmin} onDirtyChange={setAttendanceDirty} />}
         {activeTab === 'dashboard' && <Dashboard user={user} groups={groups} isAdmin={isAdmin} />}
         {activeTab === 'new' && <NewMember user={user} groups={groups} isAdmin={isAdmin} />}
-        {activeTab === 'leaders' && <LeaderAdmin groups={groups} />}
+        {activeTab === 'renewal' && <RenewalAdmin groups={groups} onDirtyChange={setRenewalDirty} />}
       </main>
     </div>
   )
