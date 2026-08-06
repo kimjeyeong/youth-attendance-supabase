@@ -1,0 +1,12 @@
+# Netlify 배포 설정
+# 앱이 frontend/ 하위에 있으므로 base 를 지정해야 한다.
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "dist"          # base 기준 상대경로 → frontend/dist
+
+# 단일 페이지 앱: 어떤 경로로 들어와도 index.html 을 돌려준다.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

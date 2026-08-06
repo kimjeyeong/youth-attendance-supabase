@@ -52,8 +52,15 @@ npm run build
 
 ## 배포 (인터넷에 올리기)
 
-- **Vercel**(추천): GitHub 레포 연결 → Root Directory 를 `frontend` 로 지정 → 환경변수 `VITE_API_URL` 추가 → 배포
+앱이 `frontend/` 하위에 있으므로 **빌드 위치 지정이 필수**입니다. 지정하지 않으면 배포 후 `Page not found`(404) 가 뜹니다.
+
+- **Netlify**: 루트의 `netlify.toml` 이 base/publish 를 자동 지정합니다.
+  Site configuration → Environment variables 에 **`VITE_API_URL`** 추가 후 재배포하세요.
+- **Vercel**: GitHub 레포 연결 → Root Directory 를 `frontend` 로 지정 → 환경변수 `VITE_API_URL` 추가 → 배포
 - **GitHub Pages**: `frontend/vite.config.js` 의 `base` 를 `'/저장소이름/'` 로 바꾼 뒤 `npm run build` → `dist/` 를 Pages 로 배포
+
+> `VITE_API_URL` 은 빌드 시점에 번들로 주입됩니다. 배포 환경에 값이 없으면 실제 시트 대신
+> **예시 데이터(예시모드)** 로 동작하니, 환경변수를 넣은 뒤 반드시 재배포하세요.
 
 ## 배경
 
