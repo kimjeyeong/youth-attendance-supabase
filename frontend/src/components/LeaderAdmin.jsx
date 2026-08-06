@@ -5,7 +5,7 @@ function leaderKey(groupId, leader) {
   return `${groupId}:${leader.userId || leader.memberId}`
 }
 
-// 최고권한 전용: 순장을 지정하면 로그인 계정(액세스 코드)까지 자동으로 만들어진다.
+// 최고권한 전용: 새 순장에게 이메일 계정을 연결할 일회용 코드를 발급한다.
 export default function LeaderAdmin({ groups }) {
   const [leaders, setLeaders] = useState([])
   const [members, setMembers] = useState([])
@@ -42,12 +42,17 @@ export default function LeaderAdmin({ groups }) {
     const member = members.find((x) => String(x.id) === String(memberId))
     const group = leaders.find((x) => x.groupId === groupId)
     const action = group?.multiple ? '추가' : '지정'
-    if (!window.confirm(`${member?.name}님을 ${group?.groupName} 순장으로 ${action}할까요?\n개별 로그인 코드가 자동 발급됩니다.`)) return
+    if (!window.confirm(`${member?.name}님을 ${group?.groupName} 순장으로 ${action}할까요?\n이메일 계정 연결용 일회용 코드가 발급됩니다.`)) return
     setBusyId(groupId); setMsg('')
     const res = await call('setLeader', { groupId, memberId })
     setBusyId(null)
     if (res.ok) {
-      notify(true, `${res.leaderName} 순장 ${action} 완료${res.isNew || res.codeChanged ? ` · 새 코드 ${res.code}` : ' (기존 코드 유지)'}`)
+      const accountMessage = res.accountLinked
+        ? ' · 기존 이메일 계정 자동 연결'
+        : res.isNew || res.codeChanged
+          ? ` · 연결 코드 ${res.code}`
+          : ' (기존 계정 유지)'
+      notify(true, `${res.leaderName} 순장 ${action} 완료${accountMessage}`)
       setRevealed((prev) => new Set(prev).add(leaderKey(groupId, res)))
       load()
     } else notify(false, '지정 실패: ' + (res.error || ''))
@@ -67,12 +72,12 @@ export default function LeaderAdmin({ groups }) {
   }
 
   async function regenerate(group, leader) {
-    if (!window.confirm(`${leader.name} 순장의 코드를 새로 발급할까요?\n기존 코드는 즉시 사용할 수 없게 됩니다.`)) return
+    if (!window.confirm(`${leader.name} 순장의 연결 코드를 새로 발급할까요?\n기존 코드는 즉시 사용할 수 없게 됩니다.`)) return
     setBusyId(group.groupId); setMsg('')
     const res = await call('regenerateCode', { groupId: group.groupId, userId: leader.userId })
     setBusyId(null)
     if (res.ok) {
-      notify(true, `새 코드: ${res.code}`)
+      notify(true, `새 연결 코드: ${res.code}`)
       setRevealed((prev) => new Set(prev).add(leaderKey(group.groupId, leader)))
       load()
     } else notify(false, '재발급 실패: ' + (res.error || ''))
@@ -117,8 +122,8 @@ export default function LeaderAdmin({ groups }) {
       <div className="card">
         <h2>순장 지정 <span className="muted">(최고권한)</span></h2>
         <p className="muted small">
-          순장을 지정하면 그 사람의 <b>로그인 코드가 자동 발급</b>되고, 시트의 순장 정보도 함께 갱신됩니다.
-          새순·새내기순은 여러 명을 추가할 수 있으며, 발급된 코드는 각자에게 개별로 전달하세요.
+          순장을 지정하면 <b>이메일 계정 연결용 일회용 코드</b>가 발급됩니다.
+          새 순장은 이메일 가입·인증 후 코드를 한 번 입력하며, 연결된 코드는 즉시 폐기됩니다.
         </p>
         {msg && <div className={msgOk ? 'savemsg formmsg' : 'savemsg formmsg error'} role="status">{msg}</div>}
       </div>
@@ -139,7 +144,7 @@ export default function LeaderAdmin({ groups }) {
         const currentLeaders = hasLeaderList
           ? l.leaders
           : l.leaderName
-            ? [{ memberId: l.leaderId, userId: '', name: l.leaderName, code: l.code, active: l.active }]
+            ? [{ memberId: l.leaderId, userId: '', name: l.leaderName, code: l.code, active: l.active, accountLinked: false }]
             : []
         const needsBackendUpdate = multiple && !hasLeaderList
         const activeCount = currentLeaders.filter((leader) => leader.active).length
@@ -167,6 +172,7 @@ export default function LeaderAdmin({ groups }) {
                     <div className="leaderentry" key={key}>
                       <div className="leaderentry-top">
                         <span className="name">{leader.name || `구성원 #${leader.memberId}`}</span>
+                        {leader.accountLinked && <span className="tag linked">이메일 연결됨</span>}
                         {!leader.active && <span className="tag new">비활성</span>}
                       </div>
                       {leader.code && (
@@ -179,7 +185,7 @@ export default function LeaderAdmin({ groups }) {
                         </div>
                       )}
                       <div className="leaderentry-actions">
-                        {leader.userId && (
+                        {leader.userId && !leader.accountLinked && (
                           <button type="button" className="minibtn" disabled={busy || needsBackendUpdate} onClick={() => regenerate(l, leader)}>재발급</button>
                         )}
                         <button type="button" className="minibtn danger" disabled={busy || needsBackendUpdate} onClick={() => clearLeader(l, leader)}>해제</button>

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { call, getCode, clearCode } from './api.js'
-import { MOCK } from './config.js'
+import { MOCK, SUPABASE } from './config.js'
+import { signOut, supabase } from './supabase-client.js'
 import Login from './components/Login.jsx'
+import ClaimAccount from './components/ClaimAccount.jsx'
+import PasswordRecovery from './components/PasswordRecovery.jsx'
 import AttendanceBoard from './components/AttendanceBoard.jsx'
 import NewMember from './components/NewMember.jsx'
 import Dashboard from './components/Dashboard.jsx'
@@ -14,9 +17,51 @@ export default function App() {
   const [booting, setBooting] = useState(true)
   const [attendanceDirty, setAttendanceDirty] = useState(false)
   const [renewalDirty, setRenewalDirty] = useState(false)
+  const [needsClaim, setNeedsClaim] = useState(false)
+  const [recovering, setRecovering] = useState(false)
 
-  // 저장된 코드로 자동 로그인 시도
   useEffect(() => {
+    let active = true
+
+    async function loadSupabaseUser(session) {
+      if (!active) return
+      if (!session) {
+        setUser(null)
+        setGroups([])
+        setNeedsClaim(false)
+        setBooting(false)
+        return
+      }
+      const res = await call('login')
+      if (!active) return
+      if (res.ok) {
+        setUser(res.user)
+        setGroups(res.groups || [])
+        setNeedsClaim(false)
+      } else if (res.code === 'ACCOUNT_NOT_LINKED') {
+        setUser(null)
+        setNeedsClaim(true)
+      }
+      setBooting(false)
+    }
+
+    if (SUPABASE) {
+      supabase.auth.getSession().then(({ data }) => loadSupabaseUser(data.session))
+      const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setRecovering(true)
+          setBooting(false)
+          return
+        }
+        window.setTimeout(() => loadSupabaseUser(session), 0)
+      })
+      return () => {
+        active = false
+        listener.subscription.unsubscribe()
+      }
+    }
+
+    // 예시 모드와 기존 Apps Script는 저장된 코드로 자동 로그인한다.
     const code = getCode()
     if (!code) { setBooting(false); return }
     call('login', {}).then((res) => {
@@ -24,19 +69,28 @@ export default function App() {
       else clearCode()
       setBooting(false)
     })
+    return () => { active = false }
   }, [])
 
   function onLogin(res) {
     setUser(res.user)
     setGroups(res.groups || [])
   }
-  function logout() {
+  async function logout() {
     if ((attendanceDirty || renewalDirty) && !window.confirm('저장하지 않은 변경사항이 있습니다. 로그아웃할까요?')) return
-    clearCode()
+    if (SUPABASE) await signOut()
+    else clearCode()
     setUser(null)
+    setGroups([])
+    setNeedsClaim(false)
     setTab('attendance')
     setAttendanceDirty(false)
     setRenewalDirty(false)
+  }
+
+  function onClaimed(res) {
+    setNeedsClaim(false)
+    onLogin(res)
   }
   function changeTab(nextTab) {
     if (tab === 'attendance' && nextTab !== 'attendance' && attendanceDirty
@@ -49,7 +103,9 @@ export default function App() {
   }
 
   if (booting) return <div className="center muted">불러오는 중…</div>
-  if (!user) return <Login onLogin={onLogin} />
+  if (recovering) return <PasswordRecovery onComplete={() => setRecovering(false)} />
+  if (needsClaim) return <ClaimAccount onClaimed={onClaimed} onLogout={() => setNeedsClaim(false)} />
+  if (!user) return <Login onLogin={onLogin} onNeedsClaim={() => setNeedsClaim(true)} />
 
   const isAdmin = user.role === '최고권한'
 
