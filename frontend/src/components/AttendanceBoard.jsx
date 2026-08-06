@@ -2,10 +2,17 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { call } from '../api.js'
 import MemberRow from './MemberRow.jsx'
 
-function todayStr() {
-  const d = new Date()
+function fmt(d) {
   const p = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+function todayStr() { return fmt(new Date()) }
+// 'YYYY-MM-DD' 에 n일 더하기 (로컬 기준, 시간대 문제 없음)
+function addDays(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + n)
+  return fmt(dt)
 }
 
 export default function AttendanceBoard({ user, groups, isAdmin }) {
@@ -68,6 +75,11 @@ export default function AttendanceBoard({ user, groups, isAdmin }) {
         <label className="field">
           <span>날짜</span>
           <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+          <div className="datenav">
+            <button type="button" onClick={() => setDate(addDays(date, -7))}>◀ 지난주</button>
+            <button type="button" className={date === todayStr() ? 'today on' : 'today'} onClick={() => setDate(todayStr())}>오늘</button>
+            <button type="button" onClick={() => setDate(addDays(date, 7))}>다음주 ▶</button>
+          </div>
         </label>
         {isAdmin && (
           <label className="field">

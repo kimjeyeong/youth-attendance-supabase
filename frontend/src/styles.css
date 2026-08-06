@@ -65,6 +65,15 @@ body {
 .field { display: flex; flex-direction: column; font-size: 13px; color: var(--muted); flex: 1; }
 .controls { display: flex; gap: 10px; }
 
+/* 날짜 빠른 이동 */
+.datenav { display: flex; gap: 6px; margin-top: 8px; }
+.datenav button {
+  flex: 1; padding: 8px 4px; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--line); background: #fff; color: var(--text); border-radius: 8px;
+}
+.datenav button:active { background: #eef1f6; }
+.datenav button.today.on { background: var(--primary); color: #fff; border-color: transparent; font-weight: 700; }
+
 .btn {
   padding: 12px 18px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
   cursor: pointer; width: 100%; margin-top: 12px;
