@@ -56,8 +56,10 @@ export default function Dashboard({ user, groups, isAdmin }) {
           {/* 요약 타일 */}
           <div className="tiles">
             <Tile label="인원" value={stats.total} unit="명" />
-            <Tile label="최근 예배 출석률" value={stats.latestRate} unit="%" accent="ok" />
-            <Tile label="순모임 참석률" value={stats.cellRate} unit="%" accent="on" />
+            <Tile label="최근 예배 출석률" value={stats.latestRate} unit="%" accent="ok"
+              sub={`${stats.latestPresent} / ${stats.latestTotal}명`} />
+            <Tile label="순모임 참석률" value={stats.cellRate} unit="%" accent="on"
+              sub={`${stats.cellPresent} / ${stats.cellTotal}명`} />
             <Tile label="신규자" value={stats.newbies} unit="명" accent="new" />
           </div>
 
@@ -67,11 +69,12 @@ export default function Dashboard({ user, groups, isAdmin }) {
             {stats.weekly.length === 0 ? <div className="muted">데이터가 없습니다.</div> : (
               <div className="barchart">
                 {stats.weekly.map((w) => (
-                  <div className="barcol" key={w.date} title={`${w.date} · 출석 ${w.present}/${w.total}`}>
-                    <div className="barval">{w.rate}</div>
+                  <div className="barcol" key={w.date} title={`${w.date} · 출석 ${w.present}/${w.total}명 (${w.rate}%)`}>
+                    <div className="barval">{w.rate}%</div>
                     <div className="bartrack">
                       <div className="bar" style={{ height: Math.max(4, w.rate) + '%' }} />
                     </div>
+                    <div className="barcnt">{w.present}/{w.total}</div>
                     <div className="barlbl">{w.label}</div>
                   </div>
                 ))}
@@ -85,12 +88,12 @@ export default function Dashboard({ user, groups, isAdmin }) {
               <h2>순별 출석률 비교</h2>
               <div className="hbars">
                 {stats.byGroup.map((g) => (
-                  <div className="hbar" key={g.id}>
+                  <div className="hbar" key={g.id} title={`${g.name} · 출석 ${g.present}/${g.total}명`}>
                     <div className="hbar-name">{g.name}</div>
                     <div className="hbar-track">
                       <div className="hbar-fill" style={{ width: g.rate + '%' }} />
                     </div>
-                    <div className="hbar-val">{g.rate}%</div>
+                    <div className="hbar-val">{g.rate}%<span className="hbar-cnt">{g.present}/{g.total}</span></div>
                   </div>
                 ))}
               </div>
@@ -120,11 +123,12 @@ export default function Dashboard({ user, groups, isAdmin }) {
   )
 }
 
-function Tile({ label, value, unit, accent }) {
+function Tile({ label, value, unit, accent, sub }) {
   return (
     <div className={'tile ' + (accent || '')}>
       <div className="tile-val">{value}<span className="tile-unit">{unit}</span></div>
       <div className="tile-lbl">{label}</div>
+      {sub && <div className="tile-sub">{sub}</div>}
     </div>
   )
 }

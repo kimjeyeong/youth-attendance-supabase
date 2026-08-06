@@ -5,6 +5,7 @@ import Login from './components/Login.jsx'
 import AttendanceBoard from './components/AttendanceBoard.jsx'
 import NewMember from './components/NewMember.jsx'
 import Dashboard from './components/Dashboard.jsx'
+import LeaderAdmin from './components/LeaderAdmin.jsx'
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -51,7 +52,8 @@ export default function App() {
   const newbieGid = groups.find((g) => g.type === '새순')?.id
   const rookieGid = groups.find((g) => g.type === '새내기')?.id
   const canSeeNew = isAdmin || user.groupId === newbieGid || user.groupId === rookieGid
-  const activeTab = tab === 'new' && !canSeeNew ? 'attendance' : tab
+  const allowed = { attendance: true, dashboard: true, new: canSeeNew, leaders: isAdmin }
+  const activeTab = allowed[tab] ? tab : 'attendance'
 
   return (
     <div className="app">
@@ -78,12 +80,18 @@ export default function App() {
             신규자
           </button>
         )}
+        {isAdmin && (
+          <button className={activeTab === 'leaders' ? 'tab on' : 'tab'} onClick={() => changeTab('leaders')}>
+            순장
+          </button>
+        )}
       </nav>
 
       <main>
         {activeTab === 'attendance' && <AttendanceBoard user={user} groups={groups} isAdmin={isAdmin} onDirtyChange={setAttendanceDirty} />}
         {activeTab === 'dashboard' && <Dashboard user={user} groups={groups} isAdmin={isAdmin} />}
         {activeTab === 'new' && <NewMember user={user} groups={groups} isAdmin={isAdmin} />}
+        {activeTab === 'leaders' && <LeaderAdmin groups={groups} />}
       </main>
     </div>
   )

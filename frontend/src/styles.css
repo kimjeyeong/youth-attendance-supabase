@@ -134,28 +134,42 @@ h2 { font-size: 16px; margin: 4px 0 10px; }
 /* ===== 대시보드 ===== */
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
 .tile { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
-.tile-val { font-size: 26px; font-weight: 800; color: var(--text); }
+.tile-val { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1.15; }
 .tile-unit { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 3px; }
 .tile-lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.tile-sub { font-size: 12px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .tile.ok .tile-val { color: var(--ok); }
 .tile.on .tile-val { color: var(--on); }
 .tile.new .tile-val { color: #a9791a; }
 
-/* 세로 막대 차트 */
-.barchart { display: flex; align-items: flex-end; gap: 4px; height: 170px; overflow-x: auto; padding-top: 6px; }
-.barcol { flex: 1 0 34px; display: flex; flex-direction: column; align-items: center; height: 100%; }
-.barval { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
-.bartrack { flex: 1; width: 60%; display: flex; align-items: flex-end; }
+/* 세로 막대 차트 — 좁은 화면에서는 가로 스크롤 */
+.barchart {
+  display: flex; align-items: flex-end; gap: 4px; height: 190px;
+  overflow-x: auto; overflow-y: hidden; padding-top: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.barcol { flex: 1 0 40px; display: flex; flex-direction: column; align-items: center; height: 100%; }
+.barval { font-size: 10px; color: var(--muted); margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+.bartrack { flex: 1; width: 60%; display: flex; align-items: flex-end; min-height: 0; }
 .bar { width: 100%; background: linear-gradient(180deg, #4a6db5, var(--primary)); border-radius: 5px 5px 0 0; transition: height .3s; }
-.barlbl { font-size: 10px; color: var(--muted); margin-top: 4px; white-space: nowrap; }
+.barcnt { font-size: 10px; color: var(--muted); margin-top: 3px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.barlbl { font-size: 10px; color: var(--muted); margin-top: 1px; white-space: nowrap; }
 
 /* 가로 막대 (순별 비교) */
 .hbars { display: flex; flex-direction: column; gap: 8px; }
 .hbar { display: flex; align-items: center; gap: 8px; }
-.hbar-name { width: 64px; font-size: 13px; text-align: right; color: var(--text); flex-shrink: 0; }
-.hbar-track { flex: 1; background: #eef1f6; border-radius: 8px; height: 18px; overflow: hidden; }
+.hbar-name {
+  width: 68px; font-size: 13px; text-align: right; color: var(--text);
+  flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hbar-track { flex: 1; min-width: 0; background: #eef1f6; border-radius: 8px; height: 18px; overflow: hidden; }
 .hbar-fill { height: 100%; background: linear-gradient(90deg, #4a6db5, var(--primary)); border-radius: 8px; transition: width .3s; }
-.hbar-val { width: 40px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+.hbar-val {
+  width: 62px; font-size: 12px; color: var(--muted); flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.hbar-cnt { font-size: 10px; opacity: .8; }
 
 /* 심방 대상 */
 .absrow { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--line); }
@@ -164,6 +178,63 @@ h2 { font-size: 16px; margin: 4px 0 10px; }
 .absrow .small { font-size: 12px; }
 .absrow .chip { margin-left: auto; }
 
-@media (max-width: 480px) {
-  .controls { flex-direction: column; }
+/* ===== 반응형 ===== */
+/* 태블릿: 본문 폭을 넓혀 여백을 활용 */
+@media (min-width: 700px) {
+  .app { max-width: 860px; }
+  .savebar { max-width: 860px; }
+  .tiles { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* 휴대폰: 한 줄에 밀어넣지 말고 세로로 쌓아 글자 잘림 방지 */
+@media (max-width: 560px) {
+  .controls { flex-direction: column; gap: 12px; }
+  .row-top { gap: 6px; }
+  .name { font-size: 15px; }
+  .seg { font-size: 13px; padding: 10px 4px; }
+  .segset.small .seg { font-size: 12px; }
+  .tile-val { font-size: 22px; }
+  .hbar-name { width: 56px; font-size: 12px; }
+  .hbar-val { width: 56px; }
+  /* 순장 관리: 지정 셀렉트와 해제 버튼이 겹치지 않게 */
+  .assignrow { flex-direction: column; align-items: stretch; gap: 8px; }
+  .assignrow .input { max-width: none; }
+  .leadertop { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .codebox { gap: 5px; }
+  .codeval { flex: 1 1 100%; }
+}
+
+/* 아주 좁은 화면(360px 이하): 순모임 버튼 줄바꿈 허용 */
+@media (max-width: 360px) {
+  .card { margin: 8px; padding: 12px; }
+  .segset { flex-wrap: wrap; }
+  .segset .seg { min-width: 30%; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+}
+
+/* 가로 스크롤이 절대 생기지 않도록 */
+html, body { max-width: 100%; overflow-x: hidden; }
+.board, .card, .row { min-width: 0; }
+
+/* ===== 순장 관리 ===== */
+.small { font-size: 12px; }
+.leadercard { padding: 12px 14px; }
+.leadertop { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.leadernow { font-size: 13px; color: var(--ok); font-weight: 600; }
+.leadernow.none { color: var(--muted); font-weight: 400; }
+
+.codebox { display: flex; align-items: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.codeval {
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px;
+  background: #eef1f6; border-radius: 8px; padding: 6px 10px; letter-spacing: .5px;
+}
+.minibtn {
+  padding: 6px 10px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--line); background: #fff; color: var(--text); border-radius: 8px;
+}
+.minibtn:active { background: #eef1f6; }
+.minibtn:disabled { opacity: .5; }
+.minibtn.danger { color: var(--no); border-color: #f0c9c9; }
+
+.leaderactions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.leaderactions .input { margin-top: 0; flex: 1; min-width: 0; }

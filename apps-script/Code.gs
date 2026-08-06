@@ -63,6 +63,10 @@ function handle(req) {
     case 'saveAttendance':return saveAttendance(req, user);
     case 'addMember':     return addMember(req, user);
     case 'assignGroup':   return assignGroup(req, user);
+    case 'getLeaders':    return getLeaders(user);
+    case 'setLeader':     return setLeader(req, user);
+    case 'clearLeader':   return clearLeader(req, user);
+    case 'regenerateCode':return regenerateCode(req, user);
     default:              return { ok: false, error: '알 수 없는 action: ' + action };
   }
 }
@@ -404,6 +408,185 @@ function assignGroup(req, user) {
       }
     }
     return { ok: false, error: '해당 member를 찾을 수 없습니다.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ===== 순장 관리 (최고권한 전용) =====
+// 시트에 member_id 를 손으로 넣지 않고, 앱에서 순장을 지정하면
+// groups(순장_member_id) 와 users(로그인 계정)가 함께 갱신된다.
+
+// 혼동하기 쉬운 글자(0/O, 1/l 등)를 뺀 액세스 코드 생성
+function generateAccessCode(prefix, taken) {
+  var chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  for (var attempt = 0; attempt < 50; attempt++) {
+    var suffix = '';
+    for (var i = 0; i < 4; i++) suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    var code = String(prefix).toLowerCase() + '-' + suffix;
+    if (!taken[code]) return code;
+  }
+  return String(prefix).toLowerCase() + '-' + new Date().getTime();
+}
+
+// users 탭에서 특정 순의 순장 행 찾기
+function findLeaderRow(rows, groupId) {
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i]['역할']).trim() === '순장'
+        && String(rows[i]['담당순ID']).trim() === String(groupId)) {
+      return rows[i];
+    }
+  }
+  return null;
+}
+
+// 순 목록 + 각 순의 순장/액세스코드 (최고권한이 코드를 나눠줘야 하므로 코드 포함)
+function getLeaders(user) {
+  if (!isAdmin(user)) return { ok: false, error: '최고권한만 조회할 수 있습니다.' };
+  var groups = getGroups();
+  var memberRows = readObjects(TAB.members).rows;
+  var userRows = readObjects(TAB.users).rows;
+
+  var nameById = {};
+  memberRows.forEach(function (m) { nameById[String(m['id'])] = m['이름']; });
+
+  var list = groups.map(function (g) {
+    var leaderId = String(g.leaderId === undefined || g.leaderId === null ? '' : g.leaderId).trim();
+    var row = findLeaderRow(userRows, g.id);
+    return {
+      groupId: g.id,
+      groupName: g.name,
+      type: g.type,
+      leaderId: leaderId,
+      leaderName: leaderId ? (nameById[leaderId] || '') : '',
+      code: row ? String(row['액세스코드']).trim() : '',
+      active: row ? String(row['활성']).trim().toUpperCase() === 'Y' : false
+    };
+  });
+  return { ok: true, leaders: list };
+}
+
+// 순장 지정: groups.순장_member_id 갱신 + users 계정 생성/갱신(코드 자동 발급)
+function setLeader(req, user) {
+  if (!isAdmin(user)) return { ok: false, error: '최고권한만 순장을 지정할 수 있습니다.' };
+  var groupId = String(req.groupId || '').trim();
+  var memberId = String(req.memberId === undefined ? '' : req.memberId).trim();
+  if (!groupId || !memberId) return { ok: false, error: 'groupId, memberId 가 필요합니다.' };
+
+  var group = getGroups().filter(function (g) { return g.id === groupId; })[0];
+  if (!group) return { ok: false, error: '해당 순을 찾을 수 없습니다.' };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    // 1) 대상 구성원 확인
+    var mData = readObjects(TAB.members);
+    var member = null;
+    for (var i = 0; i < mData.rows.length; i++) {
+      if (String(mData.rows[i]['id']) === memberId) { member = mData.rows[i]; break; }
+    }
+    if (!member) return { ok: false, error: '해당 구성원을 찾을 수 없습니다.' };
+    if (String(member['상태']).trim() === '비활성') {
+      return { ok: false, error: '비활성 구성원은 순장으로 지정할 수 없습니다.' };
+    }
+
+    // 2) groups 탭 갱신
+    var gData = readObjects(TAB.groups);
+    requireHeaders(gData.map, ['순ID', '순장_member_id']);
+    var updated = false;
+    for (var g = 0; g < gData.rows.length; g++) {
+      if (String(gData.rows[g]['순ID']).trim() === groupId) {
+        gData.sh.getRange(gData.rows[g]._row, gData.map['순장_member_id'] + 1).setValue(Number(memberId) || memberId);
+        updated = true;
+        break;
+      }
+    }
+    if (!updated) return { ok: false, error: 'groups 탭에서 순을 찾을 수 없습니다.' };
+
+    // 3) users 탭: 기존 순장 계정이 있으면 이름만 교체(코드 유지), 없으면 새로 발급
+    var uData = readObjects(TAB.users);
+    requireHeaders(uData.map, ['user_id', '이름', '역할', '담당순ID', '액세스코드', '활성']);
+    var taken = {};
+    var maxNum = 0;
+    uData.rows.forEach(function (row) {
+      taken[String(row['액세스코드']).trim()] = true;
+      var n = parseInt(String(row['user_id']).replace(/\D/g, ''), 10);
+      if (!isNaN(n) && n > maxNum) maxNum = n;
+    });
+
+    var existing = findLeaderRow(uData.rows, groupId);
+    var code;
+    if (existing) {
+      code = String(existing['액세스코드']).trim();
+      if (!code) { code = generateAccessCode(groupId, taken); }
+      uData.sh.getRange(existing._row, uData.map['이름'] + 1).setValue(member['이름']);
+      uData.sh.getRange(existing._row, uData.map['액세스코드'] + 1).setValue(code);
+      uData.sh.getRange(existing._row, uData.map['활성'] + 1).setValue('Y');
+    } else {
+      code = generateAccessCode(groupId, taken);
+      var row = [];
+      row[uData.map['user_id']] = 'u' + (maxNum + 1);
+      row[uData.map['이름']] = member['이름'];
+      row[uData.map['역할']] = '순장';
+      row[uData.map['담당순ID']] = groupId;
+      row[uData.map['액세스코드']] = code;
+      row[uData.map['활성']] = 'Y';
+      if (uData.map['비고'] !== undefined) row[uData.map['비고']] = group.name + ' 순장';
+      for (var c = 0; c < uData.sh.getLastColumn(); c++) if (row[c] === undefined) row[c] = '';
+      uData.sh.appendRow(row);
+    }
+    return { ok: true, code: code, leaderName: member['이름'], isNew: !existing };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// 순장 해제: groups 의 순장 비우고 users 계정 비활성화(로그인 차단)
+function clearLeader(req, user) {
+  if (!isAdmin(user)) return { ok: false, error: '최고권한만 순장을 해제할 수 있습니다.' };
+  var groupId = String(req.groupId || '').trim();
+  if (!groupId) return { ok: false, error: 'groupId 가 필요합니다.' };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var gData = readObjects(TAB.groups);
+    requireHeaders(gData.map, ['순ID', '순장_member_id']);
+    for (var g = 0; g < gData.rows.length; g++) {
+      if (String(gData.rows[g]['순ID']).trim() === groupId) {
+        gData.sh.getRange(gData.rows[g]._row, gData.map['순장_member_id'] + 1).setValue('');
+        break;
+      }
+    }
+    var uData = readObjects(TAB.users);
+    requireHeaders(uData.map, ['역할', '담당순ID', '활성']);
+    var existing = findLeaderRow(uData.rows, groupId);
+    if (existing) uData.sh.getRange(existing._row, uData.map['활성'] + 1).setValue('N');
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// 액세스 코드 재발급 (코드가 유출됐을 때)
+function regenerateCode(req, user) {
+  if (!isAdmin(user)) return { ok: false, error: '최고권한만 코드를 재발급할 수 있습니다.' };
+  var groupId = String(req.groupId || '').trim();
+  if (!groupId) return { ok: false, error: 'groupId 가 필요합니다.' };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var uData = readObjects(TAB.users);
+    requireHeaders(uData.map, ['역할', '담당순ID', '액세스코드', '활성']);
+    var existing = findLeaderRow(uData.rows, groupId);
+    if (!existing) return { ok: false, error: '먼저 순장을 지정하세요.' };
+    var taken = {};
+    uData.rows.forEach(function (row) { taken[String(row['액세스코드']).trim()] = true; });
+    var code = generateAccessCode(groupId, taken);
+    uData.sh.getRange(existing._row, uData.map['액세스코드'] + 1).setValue(code);
+    uData.sh.getRange(existing._row, uData.map['활성'] + 1).setValue('Y');
+    return { ok: true, code: code };
   } finally {
     lock.releaseLock();
   }

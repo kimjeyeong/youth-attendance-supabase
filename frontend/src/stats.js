@@ -24,11 +24,16 @@ export function computeStats(members, records, groups) {
     total: byDate[date].total,
     rate: pct(byDate[date].present, byDate[date].total),
   }))
-  const latestRate = weekly.length ? weekly[weekly.length - 1].rate : 0
+  const latest = weekly.length ? weekly[weekly.length - 1] : null
+  const latestRate = latest ? latest.rate : 0
+  const latestPresent = latest ? latest.present : 0
+  const latestTotal = latest ? latest.total : 0
 
   let cellY = 0, cellN = 0
   records.forEach((r) => { if (r.cell === '참석') cellY++; else if (r.cell === '불참') cellN++ })
   const cellRate = pct(cellY, cellY + cellN)
+  const cellPresent = cellY
+  const cellTotal = cellY + cellN
 
   const gp = {}
   records.forEach((r) => {
@@ -39,7 +44,13 @@ export function computeStats(members, records, groups) {
     if (r.worship === '출석' || r.worship === '온라인') gp[groupId].present++
   })
   const byGroup = Object.keys(gp)
-    .map((groupId) => ({ id: groupId, name: groupName[groupId] || groupId, rate: pct(gp[groupId].present, gp[groupId].total) }))
+    .map((groupId) => ({
+      id: groupId,
+      name: groupName[groupId] || groupId,
+      rate: pct(gp[groupId].present, gp[groupId].total),
+      present: gp[groupId].present,
+      total: gp[groupId].total,
+    }))
     .sort((a, b) => b.rate - a.rate)
 
   const recentDates = new Set(allDates.slice(-8))
@@ -63,5 +74,9 @@ export function computeStats(members, records, groups) {
     .sort((a, b) => b.absent - a.absent)
     .slice(0, 12)
 
-  return { total, newbies, weekly, latestRate, cellRate, byGroup, absentees, recentWeeks }
+  return {
+    total, newbies, weekly, byGroup, absentees, recentWeeks,
+    latestRate, latestPresent, latestTotal,
+    cellRate, cellPresent, cellTotal,
+  }
 }
