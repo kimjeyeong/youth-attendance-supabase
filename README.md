@@ -34,6 +34,16 @@ npm run dev
 `.env` 없이 실행하면 **예시 데이터(오프라인 모드)** 로 화면을 미리 볼 수 있습니다.
 (예시 코드: `g2-5012` 순장 / `admin-1488` 최고권한)
 
+예시 모드에는 실제 명단이나 운영용 액세스 코드를 넣지 마세요. 실제 데이터는 Google Sheet에만 보관합니다.
+
+## 점검
+
+```bash
+cd frontend
+npm test
+npm run build
+```
+
 ## 실제 데이터에 연결하기
 
 1. **백엔드 배포**: `apps-script/README.md` 를 따라 Apps Script를 웹 앱으로 배포 → URL 복사

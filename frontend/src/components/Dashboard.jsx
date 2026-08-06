@@ -1,25 +1,34 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { call } from '../api.js'
-
-function pct(n, d) { return d > 0 ? Math.round((n / d) * 100) : 0 }
+import { computeStats } from '../stats.js'
 
 export default function Dashboard({ user, groups, isAdmin }) {
   const [groupId, setGroupId] = useState(isAdmin ? '' : user.groupId) // '' = 전체
   const [members, setMembers] = useState([])
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const requestId = useRef(0)
 
-  async function load() {
-    setLoading(true)
-    const [m, r] = await Promise.all([
+  useEffect(() => {
+    const currentRequest = ++requestId.current
+    setLoading(true); setError('')
+    Promise.all([
       call('getMembers', { groupId }),
       call('getAttendanceRange', { groupId }),
-    ])
-    setMembers(m.ok ? m.members : [])
-    setRecords(r.ok ? r.records : [])
-    setLoading(false)
-  }
-  useEffect(() => { load() /* eslint-disable-next-line */ }, [groupId])
+    ]).then(([m, r]) => {
+      if (currentRequest !== requestId.current) return
+      if (m.ok && r.ok) {
+        setMembers(m.members || [])
+        setRecords(r.records || [])
+      } else {
+        setMembers([])
+        setRecords([])
+        setError(m.error || r.error || '분석 정보를 불러오지 못했습니다.')
+      }
+      setLoading(false)
+    })
+  }, [groupId])
 
   const stats = useMemo(() => computeStats(members, records, groups), [members, records, groups])
   const showGroupCompare = isAdmin && !groupId
@@ -38,7 +47,9 @@ export default function Dashboard({ user, groups, isAdmin }) {
         </div>
       )}
 
-      {loading ? (
+      {error ? (
+        <div className="card error" role="alert">{error}</div>
+      ) : loading ? (
         <div className="center muted">분석 중…</div>
       ) : (
         <>
@@ -116,73 +127,4 @@ function Tile({ label, value, unit, accent }) {
       <div className="tile-lbl">{label}</div>
     </div>
   )
-}
-
-// ===== 통계 계산 =====
-function computeStats(members, records, groups) {
-  const groupName = {}
-  groups.forEach((g) => { groupName[g.id] = g.name })
-
-  const total = members.length
-  const newbies = members.filter((m) => m.status === '신규자').length
-
-  // 날짜별 집계
-  const byDate = {}
-  records.forEach((r) => {
-    const d = r.date
-    if (!d) return
-    if (!byDate[d]) byDate[d] = { present: 0, total: 0 }
-    byDate[d].total++
-    if (r.worship === '출석' || r.worship === '온라인') byDate[d].present++
-  })
-  const allDates = Object.keys(byDate).sort()
-  const weekly = allDates.slice(-12).map((d) => ({
-    date: d,
-    label: d.slice(5).replace('-', '/'),
-    present: byDate[d].present,
-    total: byDate[d].total,
-    rate: pct(byDate[d].present, byDate[d].total),
-  }))
-  const latestRate = weekly.length ? weekly[weekly.length - 1].rate : 0
-
-  // 순모임 참석률 (전체 기간)
-  let cellY = 0, cellN = 0
-  records.forEach((r) => { if (r.cell === '참석') cellY++; else if (r.cell === '불참') cellN++ })
-  const cellRate = pct(cellY, cellY + cellN)
-
-  // 순별 비교
-  const gp = {}
-  records.forEach((r) => {
-    const g = r.groupId || '기타'
-    if (!gp[g]) gp[g] = { present: 0, total: 0 }
-    gp[g].total++
-    if (r.worship === '출석' || r.worship === '온라인') gp[g].present++
-  })
-  const byGroup = Object.keys(gp)
-    .map((g) => ({ id: g, name: groupName[g] || g, rate: pct(gp[g].present, gp[g].total) }))
-    .sort((a, b) => b.rate - a.rate)
-
-  // 심방 대상: 최근 8개 예배일 중 결석 횟수
-  const recentDates = new Set(allDates.slice(-8))
-  const recentWeeks = recentDates.size
-  const absentCount = {}
-  records.forEach((r) => {
-    if (recentDates.has(r.date) && r.worship === '결석') {
-      absentCount[r.memberId] = (absentCount[r.memberId] || 0) + 1
-    }
-  })
-  const mById = {}
-  members.forEach((m) => { mById[m.id] = m })
-  const absentees = Object.keys(absentCount)
-    .map((id) => ({
-      id,
-      absent: absentCount[id],
-      name: mById[id]?.name || ('#' + id),
-      groupName: groupName[mById[id]?.groupId] || '',
-    }))
-    .filter((a) => a.absent >= 2 && mById[a.id])
-    .sort((a, b) => b.absent - a.absent)
-    .slice(0, 12)
-
-  return { total, newbies, weekly, latestRate, cellRate, byGroup, absentees, recentWeeks }
 }

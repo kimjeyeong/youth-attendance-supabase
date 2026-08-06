@@ -56,7 +56,9 @@ function handle(req) {
   switch (action) {
     case 'getGroups':     return { ok: true, user: publicUser(user), groups: getGroups() };
     case 'getMembers':    return { ok: true, members: getMembers(user, req.groupId) };
-    case 'getAttendance': return { ok: true, attendance: getAttendance(req.date, user, req.groupId) };
+    case 'getAttendance':
+      if (!isValidDate(req.date)) return { ok: false, error: '날짜 형식이 올바르지 않습니다.' };
+      return { ok: true, attendance: getAttendance(req.date, user, req.groupId) };
     case 'getAttendanceRange': return { ok: true, records: getAttendanceRange(user, req.groupId) };
     case 'saveAttendance':return saveAttendance(req, user);
     case 'addMember':     return addMember(req, user);
@@ -101,6 +103,20 @@ function today() {
 }
 function nowStamp() {
   return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+}
+function isValidDate(value) {
+  var text = String(value || '');
+  var match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) return false;
+  var date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return date.getFullYear() === Number(match[1])
+    && date.getMonth() === Number(match[2]) - 1
+    && date.getDate() === Number(match[3]);
+}
+function requireHeaders(map, names) {
+  names.forEach(function (name) {
+    if (map[name] === undefined) throw new Error('필수 헤더를 찾을 수 없음: ' + name);
+  });
 }
 
 // ===== 인증 =====
@@ -223,15 +239,39 @@ function fmtDate(v) {
 
 // ===== 출석 저장 (upsert) =====
 function saveAttendance(req, user) {
-  var date = req.date;
-  var records = req.records || [];
-  if (!date) return { ok: false, error: '날짜가 없습니다.' };
+  var date = String(req.date || '');
+  if (!isValidDate(date)) return { ok: false, error: '날짜 형식이 올바르지 않습니다.' };
+  if (!Array.isArray(req.records)) return { ok: false, error: 'records 형식이 올바르지 않습니다.' };
+  if (req.records.length > 500) return { ok: false, error: '한 번에 저장할 수 있는 인원을 초과했습니다.' };
+
+  // 클라이언트가 보낸 memberId를 신뢰하지 않고, 로그인 사용자의 권한 범위로 재검증한다.
+  var allowed = {};
+  getMembers(user, isAdmin(user) ? req.groupId : user.groupId)
+    .forEach(function (member) { allowed[String(member.id)] = true; });
+  var seen = {};
+  var worshipOptions = { '': true, '출석': true, '결석': true, '온라인': true };
+  var cellOptions = { '': true, '참석': true, '불참': true };
+  var records = [];
+  for (var r = 0; r < req.records.length; r++) {
+    var input = req.records[r] || {};
+    var memberId = String(input.memberId === undefined ? '' : input.memberId).trim();
+    var worship = String(input.worship || '').trim();
+    var cell = String(input.cell || '').trim();
+    var note = String(input.note || '').trim();
+    if (!memberId || !allowed[memberId]) return { ok: false, error: '저장 권한이 없는 구성원이 포함되어 있습니다.' };
+    if (seen[memberId]) return { ok: false, error: '중복된 구성원 기록이 포함되어 있습니다.' };
+    if (!worshipOptions[worship] || !cellOptions[cell]) return { ok: false, error: '출석 상태 값이 올바르지 않습니다.' };
+    if (note.length > 500) return { ok: false, error: '비고는 500자 이내로 입력하세요.' };
+    seen[memberId] = true;
+    records.push({ memberId: memberId, worship: worship, cell: cell, note: note });
+  }
 
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
     var sh = sheet(TAB.attendance);
     var map = headerMap(sh);
+    requireHeaders(map, ['날짜', 'member_id', '예배', '순모임', '비고', '체크한사람', '기록시각']);
     var last = sh.getLastRow();
     var colDate = map['날짜'], colMid = map['member_id'];
     var colWor = map['예배'], colCell = map['순모임'], colNote = map['비고'],
@@ -239,8 +279,9 @@ function saveAttendance(req, user) {
 
     // 기존 (날짜|member) -> rowNum 인덱스
     var index = {};
+    var vals = [];
     if (last >= 2) {
-      var vals = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
+      vals = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
       for (var i = 0; i < vals.length; i++) {
         var d = fmtDate(vals[i][colDate]);
         var mid = String(vals[i][colMid]);
@@ -254,11 +295,13 @@ function saveAttendance(req, user) {
       var mid = String(rec.memberId);
       if (index[mid]) {
         var row = index[mid];
-        sh.getRange(row, colWor + 1).setValue(rec.worship || '');
-        sh.getRange(row, colCell + 1).setValue(rec.cell || '');
-        sh.getRange(row, colNote + 1).setValue(rec.note || '');
-        sh.getRange(row, colBy + 1).setValue(user.name);
-        sh.getRange(row, colTs + 1).setValue(ts);
+        var rowValues = vals[row - 2].slice();
+        rowValues[colWor] = rec.worship;
+        rowValues[colCell] = rec.cell;
+        rowValues[colNote] = rec.note;
+        rowValues[colBy] = user.name;
+        rowValues[colTs] = ts;
+        sh.getRange(row, 1, 1, sh.getLastColumn()).setValues([rowValues]);
       } else {
         var newRow = [];
         newRow[colDate] = date;
@@ -285,8 +328,16 @@ function saveAttendance(req, user) {
 function addMember(req, user) {
   var name = (req.name || '').trim();
   if (!name) return { ok: false, error: '이름을 입력하세요.' };
-  // type: '초신자' -> 새순(S1), '진급자' -> 새내기순(S2)
-  var groupId = req.type === '진급자' ? 'S2' : 'S1';
+  if (name.length > 50) return { ok: false, error: '이름은 50자 이내로 입력하세요.' };
+  if (req.type !== '초신자' && req.type !== '진급자') return { ok: false, error: '신규자 유형이 올바르지 않습니다.' };
+  var contact = String(req.contact || '').trim();
+  if (contact.length > 50) return { ok: false, error: '연락처는 50자 이내로 입력하세요.' };
+
+  // 순ID를 하드코딩하지 않고 groups 탭의 유형으로 찾는다.
+  var targetType = req.type === '진급자' ? '새내기' : '새순';
+  var targetGroup = getGroups().filter(function (group) { return String(group.type).trim() === targetType; })[0];
+  if (!targetGroup) return { ok: false, error: targetType + ' 유형의 순을 찾을 수 없습니다.' };
+  var groupId = targetGroup.id;
 
   // 권한: 최고권한 = 둘 다 / 순장 = 자기 담당순이 그 특수 순일 때만
   if (!isAdmin(user) && user.groupId !== groupId) {
@@ -304,10 +355,11 @@ function addMember(req, user) {
     });
     var newId = maxId + 1;
     var sh = data.sh, map = data.map;
+    requireHeaders(map, ['id', '이름', '연락처', '상태', '순ID', '등록일', '순배정일', '비고']);
     var row = [];
     row[map['id']] = newId;
     row[map['이름']] = name;
-    row[map['연락처']] = req.contact || '';
+    row[map['연락처']] = contact;
     row[map['상태']] = '신규자';
     row[map['순ID']] = groupId;
     row[map['등록일']] = today();
@@ -324,20 +376,35 @@ function addMember(req, user) {
 // ===== 순 배정 (최고권한 전용) =====
 function assignGroup(req, user) {
   if (!isAdmin(user)) return { ok: false, error: '최고권한만 순을 배정할 수 있습니다.' };
-  var memberId = String(req.memberId);
-  var groupId = req.groupId;
+  var memberId = String(req.memberId === undefined ? '' : req.memberId).trim();
+  var groupId = String(req.groupId || '').trim();
   if (!memberId || !groupId) return { ok: false, error: 'memberId, groupId 필요' };
 
-  var data = readObjects(TAB.members);
-  var map = data.map, sh = data.sh;
-  for (var i = 0; i < data.rows.length; i++) {
-    if (String(data.rows[i]['id']) === memberId) {
-      var row = data.rows[i]._row;
-      sh.getRange(row, map['순ID'] + 1).setValue(groupId);
-      sh.getRange(row, map['상태'] + 1).setValue('정착');
-      sh.getRange(row, map['순배정일'] + 1).setValue(today());
-      return { ok: true };
-    }
+  var targetGroup = getGroups().filter(function (group) { return group.id === groupId; })[0];
+  if (!targetGroup || String(targetGroup.type).trim() !== '일반') {
+    return { ok: false, error: '활성 상태인 일반 순으로만 배정할 수 있습니다.' };
   }
-  return { ok: false, error: '해당 member를 찾을 수 없습니다.' };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var data = readObjects(TAB.members);
+    var map = data.map, sh = data.sh;
+    requireHeaders(map, ['id', '순ID', '상태', '순배정일']);
+    for (var i = 0; i < data.rows.length; i++) {
+      if (String(data.rows[i]['id']) === memberId) {
+        if (String(data.rows[i]['상태']).trim() !== '신규자') {
+          return { ok: false, error: '배정 대기 중인 신규자만 순을 배정할 수 있습니다.' };
+        }
+        var row = data.rows[i]._row;
+        sh.getRange(row, map['순ID'] + 1).setValue(groupId);
+        sh.getRange(row, map['상태'] + 1).setValue('정착');
+        sh.getRange(row, map['순배정일'] + 1).setValue(today());
+        return { ok: true };
+      }
+    }
+    return { ok: false, error: '해당 member를 찾을 수 없습니다.' };
+  } finally {
+    lock.releaseLock();
+  }
 }

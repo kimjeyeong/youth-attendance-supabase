@@ -11,6 +11,7 @@ export default function App() {
   const [groups, setGroups] = useState([])
   const [tab, setTab] = useState('attendance') // attendance | new
   const [booting, setBooting] = useState(true)
+  const [attendanceDirty, setAttendanceDirty] = useState(false)
 
   // 저장된 코드로 자동 로그인 시도
   useEffect(() => {
@@ -18,6 +19,7 @@ export default function App() {
     if (!code) { setBooting(false); return }
     call('login', {}).then((res) => {
       if (res.ok) { setUser(res.user); setGroups(res.groups || []) }
+      else clearCode()
       setBooting(false)
     })
   }, [])
@@ -27,9 +29,17 @@ export default function App() {
     setGroups(res.groups || [])
   }
   function logout() {
+    if (attendanceDirty && !window.confirm('저장하지 않은 출석 변경사항이 있습니다. 로그아웃할까요?')) return
     clearCode()
     setUser(null)
     setTab('attendance')
+    setAttendanceDirty(false)
+  }
+  function changeTab(nextTab) {
+    if (tab === 'attendance' && nextTab !== 'attendance' && attendanceDirty
+        && !window.confirm('저장하지 않은 출석 변경사항이 있습니다. 다른 화면으로 이동할까요?')) return
+    setAttendanceDirty(false)
+    setTab(nextTab)
   }
 
   if (booting) return <div className="center muted">불러오는 중…</div>
@@ -57,21 +67,21 @@ export default function App() {
       </header>
 
       <nav className="tabs">
-        <button className={tab === 'attendance' ? 'tab on' : 'tab'} onClick={() => setTab('attendance')}>
+        <button className={activeTab === 'attendance' ? 'tab on' : 'tab'} onClick={() => changeTab('attendance')}>
           출석체크
         </button>
-        <button className={activeTab === 'dashboard' ? 'tab on' : 'tab'} onClick={() => setTab('dashboard')}>
+        <button className={activeTab === 'dashboard' ? 'tab on' : 'tab'} onClick={() => changeTab('dashboard')}>
           분석
         </button>
         {canSeeNew && (
-          <button className={activeTab === 'new' ? 'tab on' : 'tab'} onClick={() => setTab('new')}>
+          <button className={activeTab === 'new' ? 'tab on' : 'tab'} onClick={() => changeTab('new')}>
             신규자
           </button>
         )}
       </nav>
 
       <main>
-        {activeTab === 'attendance' && <AttendanceBoard user={user} groups={groups} isAdmin={isAdmin} />}
+        {activeTab === 'attendance' && <AttendanceBoard user={user} groups={groups} isAdmin={isAdmin} onDirtyChange={setAttendanceDirty} />}
         {activeTab === 'dashboard' && <Dashboard user={user} groups={groups} isAdmin={isAdmin} />}
         {activeTab === 'new' && <NewMember user={user} groups={groups} isAdmin={isAdmin} />}
       </main>

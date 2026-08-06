@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { call } from '../api.js'
 import MemberRow from './MemberRow.jsx'
 
@@ -15,7 +15,7 @@ function addDays(dateStr, n) {
   return fmt(dt)
 }
 
-export default function AttendanceBoard({ user, groups, isAdmin }) {
+export default function AttendanceBoard({ user, groups, isAdmin, onDirtyChange }) {
   const [date, setDate] = useState(todayStr())
   const [groupId, setGroupId] = useState(isAdmin ? (groups[0]?.id || '') : user.groupId)
   const [members, setMembers] = useState([])
@@ -23,36 +23,72 @@ export default function AttendanceBoard({ user, groups, isAdmin }) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [saveOk, setSaveOk] = useState(true)
+  const [error, setError] = useState('')
+  const [dirtyIds, setDirtyIds] = useState(() => new Set())
+  const requestId = useRef(0)
 
-  async function load() {
-    setLoading(true); setMsg('')
-    const [mRes, aRes] = await Promise.all([
+  useEffect(() => {
+    const currentRequest = ++requestId.current
+    setLoading(true); setMsg(''); setError('')
+    Promise.all([
       call('getMembers', { groupId }),
       call('getAttendance', { date, groupId }),
-    ])
-    if (mRes.ok) setMembers(mRes.members)
-    setRecords(aRes.ok ? aRes.attendance : {})
-    setLoading(false)
-  }
+    ]).then(([mRes, aRes]) => {
+      if (currentRequest !== requestId.current) return
+      if (mRes.ok && aRes.ok) {
+        setMembers(mRes.members || [])
+        setRecords(aRes.attendance || {})
+        setDirtyIds(new Set())
+      } else {
+        setMembers([])
+        setRecords({})
+        setError(mRes.error || aRes.error || '출석 정보를 불러오지 못했습니다.')
+      }
+      setLoading(false)
+    })
+  }, [date, groupId])
 
-  useEffect(() => { load() /* eslint-disable-next-line */ }, [date, groupId])
+  useEffect(() => {
+    function warnBeforeUnload(e) {
+      if (dirtyIds.size === 0) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnBeforeUnload)
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload)
+  }, [dirtyIds])
+
+  useEffect(() => {
+    onDirtyChange?.(dirtyIds.size > 0)
+  }, [dirtyIds, onDirtyChange])
 
   function setRec(memberId, patch) {
     setRecords((prev) => ({
       ...prev,
       [memberId]: { ...(prev[memberId] || {}), ...patch },
     }))
+    setDirtyIds((prev) => new Set(prev).add(String(memberId)))
+    setMsg('')
+  }
+
+  function changeContext(setter, value, allowEmpty = false) {
+    if (saving || (!allowEmpty && !value)) return
+    if (dirtyIds.size > 0 && !window.confirm('저장하지 않은 변경사항이 있습니다. 이동할까요?')) return
+    setter(value)
   }
 
   async function save() {
     setSaving(true); setMsg('')
-    const payload = members.map((m) => {
+    const payload = members.filter((m) => dirtyIds.has(String(m.id))).map((m) => {
       const r = records[m.id] || {}
       return { memberId: m.id, worship: r.worship || '', cell: r.cell || '', note: r.note || '' }
-    }).filter((r) => r.worship || r.cell || r.note)
-    const res = await call('saveAttendance', { date, records: payload })
+    })
+    const res = await call('saveAttendance', { date, groupId, records: payload })
     setSaving(false)
-    setMsg(res.ok ? `저장 완료 (${res.saved}명)` : '저장 실패: ' + (res.error || ''))
+    setSaveOk(res.ok)
+    setMsg(res.ok ? `저장 완료 (${res.saved}명)` : '저장 실패: ' + (res.error || '알 수 없는 오류'))
+    if (res.ok) setDirtyIds(new Set())
   }
 
   const summary = useMemo(() => {
@@ -74,17 +110,17 @@ export default function AttendanceBoard({ user, groups, isAdmin }) {
       <div className="controls card">
         <label className="field">
           <span>날짜</span>
-          <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input type="date" className="input" value={date} disabled={saving} onChange={(e) => changeContext(setDate, e.target.value)} />
           <div className="datenav">
-            <button type="button" onClick={() => setDate(addDays(date, -7))}>◀ 지난주</button>
-            <button type="button" className={date === todayStr() ? 'today on' : 'today'} onClick={() => setDate(todayStr())}>오늘</button>
-            <button type="button" onClick={() => setDate(addDays(date, 7))}>다음주 ▶</button>
+            <button type="button" disabled={saving} onClick={() => changeContext(setDate, addDays(date, -7))}>◀ 지난주</button>
+            <button type="button" disabled={saving} className={date === todayStr() ? 'today on' : 'today'} onClick={() => changeContext(setDate, todayStr())}>오늘</button>
+            <button type="button" disabled={saving} onClick={() => changeContext(setDate, addDays(date, 7))}>다음주 ▶</button>
           </div>
         </label>
         {isAdmin && (
           <label className="field">
             <span>순</span>
-            <select className="input" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+            <select className="input" value={groupId} disabled={saving} onChange={(e) => changeContext(setGroupId, e.target.value, true)}>
               <option value="">전체</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
@@ -100,7 +136,9 @@ export default function AttendanceBoard({ user, groups, isAdmin }) {
         {summary.미체크 > 0 && <span className="chip muted">미체크 {summary.미체크}</span>}
       </div>
 
-      {loading ? (
+      {error ? (
+        <div className="card error" role="alert">{error}</div>
+      ) : loading ? (
         <div className="center muted">불러오는 중…</div>
       ) : members.length === 0 ? (
         <div className="center muted">명단이 없습니다.</div>
@@ -113,9 +151,9 @@ export default function AttendanceBoard({ user, groups, isAdmin }) {
       )}
 
       <div className="savebar">
-        {msg && <span className="savemsg">{msg}</span>}
-        <button className="btn primary" onClick={save} disabled={saving || loading}>
-          {saving ? '저장 중…' : '저장'}
+        {msg && <span className={saveOk ? 'savemsg' : 'savemsg error'} role="status">{msg}</span>}
+        <button className="btn primary" onClick={save} disabled={saving || loading || dirtyIds.size === 0}>
+          {saving ? '저장 중…' : dirtyIds.size > 0 ? `저장 (${dirtyIds.size}명)` : '저장됨'}
         </button>
       </div>
     </div>

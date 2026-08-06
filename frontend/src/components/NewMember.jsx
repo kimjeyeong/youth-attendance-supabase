@@ -16,15 +16,21 @@ export default function NewMember({ user, groups, isAdmin }) {
   const [contact, setContact] = useState('')
   const [type, setType] = useState(allowed[0] || '초신자')
   const [msg, setMsg] = useState('')
+  const [msgOk, setMsgOk] = useState(true)
   const [saving, setSaving] = useState(false)
 
   const [newbies, setNewbies] = useState([])
+  const [loadingNewbies, setLoadingNewbies] = useState(false)
+  const [assigningId, setAssigningId] = useState(null)
   const 일반순 = groups.filter((g) => g.type === '일반')
 
   async function loadNewbies() {
     if (!isAdmin) return
+    setLoadingNewbies(true)
     const res = await call('getMembers', { groupId: '' })
     if (res.ok) setNewbies(res.members.filter((m) => m.status === '신규자'))
+    else { setMsgOk(false); setMsg('신규자 명단을 불러오지 못했습니다: ' + (res.error || '알 수 없는 오류')) }
+    setLoadingNewbies(false)
   }
   useEffect(() => { loadNewbies() /* eslint-disable-next-line */ }, [])
 
@@ -35,17 +41,25 @@ export default function NewMember({ user, groups, isAdmin }) {
     const res = await call('addMember', { name: name.trim(), contact, type })
     setSaving(false)
     if (res.ok) {
+      setMsgOk(true)
       setMsg(`${name} 등록 완료 (${type === '진급자' ? '새내기순' : '새 순'})`)
       setName(''); setContact('')
       loadNewbies()
-    } else setMsg('실패: ' + (res.error || ''))
+    } else { setMsgOk(false); setMsg('등록 실패: ' + (res.error || '알 수 없는 오류')) }
   }
 
   async function assign(memberId, groupId) {
     if (!groupId) return
+    const member = newbies.find((item) => String(item.id) === String(memberId))
+    const group = 일반순.find((item) => item.id === groupId)
+    if (!window.confirm(`${member?.name || '신규자'}님을 ${group?.name || groupId}에 배정할까요?`)) return
+    setAssigningId(memberId); setMsg('')
     const res = await call('assignGroup', { memberId, groupId })
-    if (res.ok) loadNewbies()
-    else alert(res.error || '배정 실패')
+    setAssigningId(null)
+    if (res.ok) {
+      setMsgOk(true); setMsg(`${member?.name || '신규자'} 순 배정 완료`)
+      loadNewbies()
+    } else { setMsgOk(false); setMsg('배정 실패: ' + (res.error || '알 수 없는 오류')) }
   }
 
   return (
@@ -67,20 +81,26 @@ export default function NewMember({ user, groups, isAdmin }) {
         <input className="input" placeholder="이름" value={name} onChange={(e) => setName(e.target.value)} />
         <input className="input" placeholder="연락처 (선택)" value={contact} onChange={(e) => setContact(e.target.value)} />
         <button className="btn primary" disabled={saving}>{saving ? '등록 중…' : '등록'}</button>
-        {msg && <div className="savemsg">{msg}</div>}
+        {msg && <div className={msgOk ? 'savemsg formmsg' : 'savemsg formmsg error'} role="status">{msg}</div>}
       </form>
 
       {isAdmin && (
         <div className="card">
           <h2>신규자 순 배정 <span className="muted">(최고권한)</span></h2>
-          {newbies.length === 0 ? (
+          {loadingNewbies ? (
+            <div className="muted">신규자 명단을 불러오는 중…</div>
+          ) : newbies.length === 0 ? (
             <div className="muted">배정 대기 중인 신규자가 없습니다.</div>
           ) : (
             <div className="list">
               {newbies.map((m) => (
                 <div key={m.id} className="row card assignrow">
                   <div className="name">{m.name} <span className="tag new">{m.groupId}</span></div>
-                  <select className="input" defaultValue="" onChange={(e) => assign(m.id, e.target.value)}>
+                  <select className="input" value="" disabled={assigningId !== null} aria-label={`${m.name} 순 배정`} onChange={(e) => {
+                    const selectedGroup = e.target.value
+                    e.target.value = ''
+                    assign(m.id, selectedGroup)
+                  }}>
                     <option value="">일반 순으로 배정…</option>
                     {일반순.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>

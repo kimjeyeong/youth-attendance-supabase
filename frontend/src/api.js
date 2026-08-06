@@ -12,8 +12,8 @@ export function clearCode() { localStorage.removeItem(CODE_KEY) }
  * Apps Script 의 CORS 제약을 피하려고 Content-Type 을 text/plain 으로 보낸다
  * (그래야 브라우저가 preflight 요청을 안 함).
  */
-export async function call(action, payload = {}) {
-  const body = { action, code: getCode(), ...payload }
+export async function call(action, payload = {}, accessCode = getCode()) {
+  const body = { ...payload, action, code: accessCode }
 
   if (MOCK) {
     const fn = mockApi[action]
@@ -27,7 +27,11 @@ export async function call(action, payload = {}) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body),
     })
-    return await res.json()
+    const data = await res.json()
+    if (!res.ok) {
+      return { ok: false, error: data?.error || `서버 오류 (${res.status})` }
+    }
+    return data
   } catch (err) {
     return { ok: false, error: '네트워크 오류: ' + err.message }
   }

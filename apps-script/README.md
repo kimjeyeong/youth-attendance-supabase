@@ -35,6 +35,7 @@
 | `login` | 액세스 코드 검증 | - |
 | `getMembers` | 명단 조회 (순장=자기 순 / 최고권한=전체 또는 지정 순) | 로그인 |
 | `getAttendance` | 특정 날짜 출석 조회 | 로그인 |
+| `getAttendanceRange` | 권한 범위의 출석 이력 조회 | 로그인 |
 | `saveAttendance` | 출석 일괄 저장 | 로그인 |
 | `addMember` | 신규자 등록 (초신자→새순 / 진급자→새내기순) | 로그인 |
 | `assignGroup` | 신규자를 일반 순에 배정 | 최고권한 |

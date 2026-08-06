@@ -11,11 +11,15 @@ export default function Login({ onLogin }) {
     e.preventDefault()
     if (!code.trim()) return
     setLoading(true); setErr('')
-    saveCode(code.trim())
-    const res = await call('login', {})
+    const accessCode = code.trim()
+    const res = await call('login', {}, accessCode)
     setLoading(false)
-    if (res.ok) onLogin(res)
-    else setErr(res.error || '로그인 실패')
+    if (res.ok) {
+      saveCode(accessCode)
+      onLogin(res)
+    } else {
+      setErr(res.error || '로그인 실패')
+    }
   }
 
   return (
@@ -26,6 +30,9 @@ export default function Login({ onLogin }) {
         <input
           className="input"
           placeholder="액세스 코드"
+          type="password"
+          autoComplete="current-password"
+          aria-label="액세스 코드"
           value={code}
           onChange={(e) => setCode(e.target.value)}
           autoFocus

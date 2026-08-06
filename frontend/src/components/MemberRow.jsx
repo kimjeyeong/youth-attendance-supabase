@@ -13,7 +13,7 @@ export default function MemberRow({ member, rec, onChange }) {
           {member.name}
           {member.status === '신규자' && <span className="tag new">신규</span>}
         </div>
-        <button className="notebtn" onClick={() => setShowNote((v) => !v)} title="비고">
+        <button type="button" className="notebtn" onClick={() => setShowNote((v) => !v)} title="비고" aria-label={`${member.name} 비고 입력`} aria-expanded={showNote}>
           ✏️
         </button>
       </div>
@@ -23,7 +23,9 @@ export default function MemberRow({ member, rec, onChange }) {
           {WORSHIP_OPTIONS.map((opt) => (
             <button
               key={opt}
+              type="button"
               className={'seg ' + (rec.worship === opt ? 'active ' + worshipClass[opt] : '')}
+              aria-pressed={rec.worship === opt}
               onClick={() => onChange({ worship: rec.worship === opt ? '' : opt })}
             >
               {opt}
@@ -34,7 +36,9 @@ export default function MemberRow({ member, rec, onChange }) {
           {CELL_OPTIONS.map((opt) => (
             <button
               key={opt}
+              type="button"
               className={'seg ' + (rec.cell === opt ? 'active ' + (opt === '참석' ? 'ok' : 'no') : '')}
+              aria-pressed={rec.cell === opt}
               onClick={() => onChange({ cell: rec.cell === opt ? '' : opt })}
             >
               순모임 {opt}

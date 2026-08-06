@@ -113,7 +113,8 @@ body {
 .seg.active.no { background: var(--no); }
 
 .assignrow { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
-.assignrow .input { margin-top: 0; max-width: 200px; }
+.assignrow .name { flex-shrink: 0; white-space: nowrap; }
+.assignrow .input { flex: 1; min-width: 0; margin-top: 0; max-width: 200px; }
 
 /* 저장 바 (하단 고정) */
 .savebar {
@@ -125,6 +126,8 @@ body {
 }
 .savebar .btn { margin-top: 0; }
 .savemsg { font-size: 13px; color: var(--ok); flex: 1; }
+.savemsg.error { color: var(--no); }
+.formmsg { display: block; margin-top: 10px; }
 
 h2 { font-size: 16px; margin: 4px 0 10px; }
 
@@ -160,3 +163,7 @@ h2 { font-size: 16px; margin: 4px 0 10px; }
 .absrow .name { font-weight: 600; }
 .absrow .small { font-size: 12px; }
 .absrow .chip { margin-left: auto; }
+
+@media (max-width: 480px) {
+  .controls { flex-direction: column; }
+}
