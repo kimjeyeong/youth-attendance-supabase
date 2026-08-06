@@ -5,5 +5,5 @@ import react from '@vitejs/plugin-react'
 // Vercel/Netlify 로 배포하면 base 는 '/' 그대로 두면 됩니다.
 export default defineConfig({
   plugins: [react()],
-  base: '/',
+  base: process.env.VITE_BASE_PATH || '/',
 })

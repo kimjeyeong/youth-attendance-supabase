@@ -12,6 +12,7 @@ frontend/.env.local
 
 # 데이터 파일 (개인정보 포함 - 커밋 금지)
 *.xlsx
+supabase/private/
 
 # OS / editor
 .DS_Store
