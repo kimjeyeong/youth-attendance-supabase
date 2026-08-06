@@ -34,7 +34,6 @@ export default function Dashboard({ user, groups, isAdmin }) {
 
   const stats = useMemo(() => computeStats(members, records, groups), [members, records, groups])
   const showGroupCompare = isAdmin && !groupId
-  const personalDisabled = isAdmin && !groupId
   const visiblePeople = useMemo(() => {
     const query = personQuery.trim().toLocaleLowerCase('ko')
     if (!query) return stats.people
@@ -71,14 +70,11 @@ export default function Dashboard({ user, groups, isAdmin }) {
           role="tab"
           aria-selected={view === 'people'}
           className={view === 'people' ? 'viewtab on' : 'viewtab'}
-          disabled={personalDisabled}
-          title={personalDisabled ? '분석 범위에서 순을 먼저 선택하세요.' : ''}
           onClick={() => setView('people')}
         >
           개인별 현황
         </button>
       </div>
-      {personalDisabled && <div className="scopehint">개인별 현황은 분석 범위에서 특정 순을 선택하면 볼 수 있습니다.</div>}
 
       {error ? (
         <div className="card error" role="alert">{error}</div>
