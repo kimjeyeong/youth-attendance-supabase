@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react'
 import { call } from '../api.js'
 
-export default function NewMember({ groups, isAdmin }) {
+export default function NewMember({ user, groups, isAdmin }) {
+  const newbieGid = groups.find((g) => g.type === '새순')?.id
+  const rookieGid = groups.find((g) => g.type === '새내기')?.id
+
+  // 등록 가능한 유형: 최고권한=둘 다 / 새순 순장=초신자만 / 새내기순 순장=진급자만
+  const canNewbie = isAdmin || user.groupId === newbieGid   // 초신자 → 새 순
+  const canRookie = isAdmin || user.groupId === rookieGid   // 진급자 → 새내기순
+  const allowed = []
+  if (canNewbie) allowed.push('초신자')
+  if (canRookie) allowed.push('진급자')
+
   const [name, setName] = useState('')
   const [contact, setContact] = useState('')
-  const [type, setType] = useState('초신자') // 초신자 | 진급자
+  const [type, setType] = useState(allowed[0] || '초신자')
   const [msg, setMsg] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -43,12 +53,16 @@ export default function NewMember({ groups, isAdmin }) {
       <form className="card" onSubmit={register}>
         <h2>신규자 등록</h2>
         <div className="seg2">
-          <button type="button" className={'seg ' + (type === '초신자' ? 'active ok' : '')} onClick={() => setType('초신자')}>
-            초신자 → 새 순
-          </button>
-          <button type="button" className={'seg ' + (type === '진급자' ? 'active ok' : '')} onClick={() => setType('진급자')}>
-            고등부 진급 → 새내기순
-          </button>
+          {canNewbie && (
+            <button type="button" className={'seg ' + (type === '초신자' ? 'active ok' : '')} onClick={() => setType('초신자')}>
+              초신자 → 새 순
+            </button>
+          )}
+          {canRookie && (
+            <button type="button" className={'seg ' + (type === '진급자' ? 'active ok' : '')} onClick={() => setType('진급자')}>
+              고등부 진급 → 새내기순
+            </button>
+          )}
         </div>
         <input className="input" placeholder="이름" value={name} onChange={(e) => setName(e.target.value)} />
         <input className="input" placeholder="연락처 (선택)" value={contact} onChange={(e) => setContact(e.target.value)} />

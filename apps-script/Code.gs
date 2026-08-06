@@ -288,6 +288,11 @@ function addMember(req, user) {
   // type: '초신자' -> 새순(S1), '진급자' -> 새내기순(S2)
   var groupId = req.type === '진급자' ? 'S2' : 'S1';
 
+  // 권한: 최고권한 = 둘 다 / 순장 = 자기 담당순이 그 특수 순일 때만
+  if (!isAdmin(user) && user.groupId !== groupId) {
+    return { ok: false, error: '이 유형의 신규자를 등록할 권한이 없습니다.' };
+  }
+
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {

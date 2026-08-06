@@ -37,6 +37,12 @@ export default function App() {
 
   const isAdmin = user.role === '최고권한'
 
+  // 신규자 등록 화면은 최고권한 + 새순/새내기순 순장만
+  const newbieGid = groups.find((g) => g.type === '새순')?.id
+  const rookieGid = groups.find((g) => g.type === '새내기')?.id
+  const canSeeNew = isAdmin || user.groupId === newbieGid || user.groupId === rookieGid
+  const activeTab = tab === 'new' && !canSeeNew ? 'attendance' : tab
+
   return (
     <div className="app">
       <header className="topbar">
@@ -54,18 +60,20 @@ export default function App() {
         <button className={tab === 'attendance' ? 'tab on' : 'tab'} onClick={() => setTab('attendance')}>
           출석체크
         </button>
-        <button className={tab === 'dashboard' ? 'tab on' : 'tab'} onClick={() => setTab('dashboard')}>
+        <button className={activeTab === 'dashboard' ? 'tab on' : 'tab'} onClick={() => setTab('dashboard')}>
           분석
         </button>
-        <button className={tab === 'new' ? 'tab on' : 'tab'} onClick={() => setTab('new')}>
-          신규자
-        </button>
+        {canSeeNew && (
+          <button className={activeTab === 'new' ? 'tab on' : 'tab'} onClick={() => setTab('new')}>
+            신규자
+          </button>
+        )}
       </nav>
 
       <main>
-        {tab === 'attendance' && <AttendanceBoard user={user} groups={groups} isAdmin={isAdmin} />}
-        {tab === 'dashboard' && <Dashboard user={user} groups={groups} isAdmin={isAdmin} />}
-        {tab === 'new' && <NewMember user={user} groups={groups} isAdmin={isAdmin} />}
+        {activeTab === 'attendance' && <AttendanceBoard user={user} groups={groups} isAdmin={isAdmin} />}
+        {activeTab === 'dashboard' && <Dashboard user={user} groups={groups} isAdmin={isAdmin} />}
+        {activeTab === 'new' && <NewMember user={user} groups={groups} isAdmin={isAdmin} />}
       </main>
     </div>
   )
