@@ -1,5 +1,6 @@
-import { API_URL, MOCK } from './config.js'
+import { API_URL, MOCK, SUPABASE, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './config.js'
 import { mockApi } from './mock.js'
+import { supabaseRpcUrl } from './supabase-url.js'
 
 // 로그인한 사람의 액세스 코드를 브라우저에 저장/사용
 const CODE_KEY = 'attendance_access_code'
@@ -22,14 +23,23 @@ export async function call(action, payload = {}, accessCode = getCode()) {
       return await fn(body)
     }
 
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body),
-    })
+    const res = SUPABASE
+      ? await fetch(supabaseRpcUrl(SUPABASE_URL), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ p_request: body }),
+        })
+      : await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(body),
+        })
     const data = await res.json()
     if (!res.ok) {
-      return { ok: false, error: data?.error || `서버 오류 (${res.status})` }
+      return { ok: false, error: data?.error || data?.message || `서버 오류 (${res.status})` }
     }
     return data
   } catch (err) {
