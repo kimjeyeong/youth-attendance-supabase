@@ -63,7 +63,7 @@ function EmailLogin({ onLogin, onNeedsClaim }) {
     const { error: loginError } = await signIn(email, password)
     if (loginError) {
       setLoading(false)
-      setError('이메일 또는 비밀번호를 확인하세요.')
+      setError('아이디·이메일 또는 비밀번호를 확인하세요.')
       return
     }
     const login = await call('login')
@@ -78,11 +78,20 @@ function EmailLogin({ onLogin, onNeedsClaim }) {
       <form className="card login" onSubmit={submit}>
         <h1>출석체크</h1>
         <p className="muted">
-          {mode === 'signin' && '순장·관리자 이메일로 로그인하세요.'}
+          {mode === 'signin' && '관리자는 admin, 순장은 이메일로 로그인하세요.'}
           {mode === 'signup' && '본인 이메일을 인증한 뒤 운영자 권한을 연결합니다.'}
           {mode === 'reset' && '가입한 이메일로 비밀번호 변경 링크를 보냅니다.'}
         </p>
-        <input className="input" type="email" autoComplete="email" placeholder="이메일" aria-label="이메일" value={email} onChange={(event) => setEmail(event.target.value)} autoFocus />
+        <input
+          className="input"
+          type={mode === 'signin' ? 'text' : 'email'}
+          autoComplete={mode === 'signin' ? 'username' : 'email'}
+          placeholder={mode === 'signin' ? '아이디 또는 이메일' : '이메일'}
+          aria-label={mode === 'signin' ? '아이디 또는 이메일' : '이메일'}
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          autoFocus
+        />
         {mode !== 'reset' && (
           <input className="input" type="password" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} placeholder="비밀번호 (10자 이상)" aria-label="비밀번호" value={password} onChange={(event) => setPassword(event.target.value)} />
         )}
