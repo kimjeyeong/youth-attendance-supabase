@@ -19,13 +19,22 @@ var TAB = {
   users: 'users'
 };
 
+// ===== 운영 중단 스위치 =====
+// 이 백엔드는 액세스 코드 하나로 시트 전체(이름·전화번호 포함)를 열어주고
+// 시도 횟수 제한도 없다. 2026-08-07 Supabase 로 이전하면서 중단했다.
+// 실수로 다시 배포하더라도 데이터가 나가지 않도록 진입점에서 막는다.
+// 이력 검증 등으로 정말 되살려야 할 때만 false 로 바꾸고, 끝나면 반드시 되돌릴 것.
+var DISABLED = true;
+
 // ===== 진입점 =====
 function doGet(e) {
+  if (DISABLED) return json({ ok: false, error: '중단된 API 입니다.' });
   // 헬스체크 / 브라우저에서 직접 열었을 때
   return json({ ok: true, message: 'attendance API is running' });
 }
 
 function doPost(e) {
+  if (DISABLED) return json({ ok: false, error: '중단된 API 입니다.' });
   var res;
   try {
     var req = JSON.parse(e.postData.contents);

@@ -14,6 +14,11 @@ Supabase Dashboard의 **SQL Editor**에서 아래 파일을 순서대로 실행�
 6. `migrations/202608070005_admin_management.sql`
 7. `migrations/202608070006_permission_hierarchy.sql`
 8. `migrations/202608070007_security_hardening.sql`
+9. `migrations/202608070008_security_fixes.sql`
+
+> `202608070008` 을 적용하면 **아직 사용하지 않은 연결 코드에 72시간 유효기간이 생깁니다.**
+> 적용 시점에 배포해 둔 코드가 있다면 72시간 안에 연결하거나, 지난 뒤에는
+> 권한관리 / 리뉴얼 화면에서 재발급하세요.
 
 가져오기 완료 후 마지막 결과는 다음 건수여야 합니다.
 
@@ -51,3 +56,9 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 - 브라우저에는 Publishable key만 사용합니다.
 - Secret key와 DB 비밀번호를 소스나 프론트엔드 환경변수에 넣지 않습니다.
 - `private/seed.sql`은 운영 개인정보와 액세스 코드를 포함하므로 절대 Git에 커밋하지 않습니다.
+- 일회용 연결 코드는 발급 후 **72시간**만 유효하고, 사용하는 즉시 폐기됩니다.
+  만료 시각이 없는 코드는 무기한이 아니라 **무효**로 처리합니다(fail-closed).
+- 초기 비밀번호 강제 변경은 auth 비밀번호 해시가 실제로 바뀐 것을 확인한 뒤에만 해제됩니다.
+- 예기치 못한 DB 오류의 원문은 Postgres 로그에만 남고 브라우저에는 일반 메시지만 갑니다.
+- 순장·권한·소속을 바꾸는 요청은 `admin_audit` 테이블에 성공·실패 모두 기록됩니다.
+  (식별자와 건수만 남기고 이름·전화번호는 남기지 않습니다. 조회는 SQL Editor 에서 합니다.)

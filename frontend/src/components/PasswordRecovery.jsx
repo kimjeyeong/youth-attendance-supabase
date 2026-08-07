@@ -21,10 +21,15 @@ export default function PasswordRecovery({ onComplete, required = false }) {
       return
     }
     if (required) {
+      // 서버는 auth 비밀번호 해시가 실제로 바뀌었는지 확인한 뒤에만 플래그를 내린다.
       const result = await call('completePasswordChange')
       if (!result.ok) {
         setLoading(false)
-        setError(result.error || '비밀번호 변경 완료를 기록하지 못했습니다. 다시 시도하세요.')
+        setError(
+          result.code === 'PASSWORD_UNCHANGED'
+            ? '비밀번호 변경이 반영되지 않았습니다. 이전과 다른 비밀번호로 다시 시도하세요.'
+            : result.error || '비밀번호 변경 완료를 기록하지 못했습니다. 다시 시도하세요.'
+        )
         return
       }
     }
