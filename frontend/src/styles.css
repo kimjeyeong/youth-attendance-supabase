@@ -304,8 +304,8 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .minibtn:disabled { opacity: .5; }
 .minibtn.danger { color: var(--no); border-color: #f0c9c9; }
 
-.leaderactions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-.leaderactions .input { margin-top: 0; flex: 1; min-width: 0; }
+.leaderactions { display: grid; gap: 8px; margin-top: 10px; }
+.leaderactions .input { margin-top: 0; min-width: 0; }
 
 /* ===== 최고권한 관리 ===== */
 .admin-invite h3 { margin: 0 0 8px; }

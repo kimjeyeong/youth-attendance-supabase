@@ -15,6 +15,7 @@ export default function LeaderAdmin({ groups }) {
   const [msgOk, setMsgOk] = useState(true)
   const [revealed, setRevealed] = useState(() => new Set())
   const [query, setQuery] = useState('')
+  const [candidateQueries, setCandidateQueries] = useState({})
 
   async function load() {
     setLoading(true)
@@ -149,6 +150,14 @@ export default function LeaderAdmin({ groups }) {
         const needsBackendUpdate = multiple && !hasLeaderList
         const activeCount = currentLeaders.filter((leader) => leader.active).length
         const selectedIds = new Set(currentLeaders.filter((leader) => leader.active).map((leader) => String(leader.memberId)))
+        const candidateQuery = (candidateQueries[l.groupId] || '').trim().toLocaleLowerCase('ko')
+        const candidateGroups = grouped.map((g) => ({
+          ...g,
+          members: g.members.filter((m) => {
+            if (multiple && selectedIds.has(String(m.id))) return false
+            return !candidateQuery || String(m.name || '').toLocaleLowerCase('ko').includes(candidateQuery)
+          }),
+        })).filter((g) => g.members.length > 0)
         return (
           <div className="card leadercard" key={l.groupId}>
             <div className="leadertop">
@@ -197,24 +206,30 @@ export default function LeaderAdmin({ groups }) {
             )}
 
             <div className="leaderactions">
+              <input
+                type="search"
+                className="input"
+                value={candidateQueries[l.groupId] || ''}
+                disabled={busy || needsBackendUpdate}
+                aria-label={`${l.groupName} 순장 후보 검색`}
+                placeholder="순장 후보 이름 검색"
+                onChange={(e) => setCandidateQueries((current) => ({ ...current, [l.groupId]: e.target.value }))}
+              />
               <select
                 className="input"
                 value=""
-                disabled={busy || needsBackendUpdate}
+                disabled={busy || needsBackendUpdate || candidateGroups.length === 0}
                 aria-label={`${l.groupName} 순장 지정`}
                 onChange={(e) => { const v = e.target.value; e.target.value = ''; setLeader(l.groupId, v) }}
               >
-                <option value="">{needsBackendUpdate ? '백엔드 재배포 필요' : multiple ? '순장 추가…' : activeCount ? '순장 변경…' : '순장 지정…'}</option>
-                {grouped.map((g) => {
-                  const choices = g.members.filter((m) => !multiple || !selectedIds.has(String(m.id)))
-                  return choices.length > 0 && (
+                <option value="">{needsBackendUpdate ? '백엔드 재배포 필요' : candidateGroups.length === 0 ? '검색 결과 없음' : multiple ? '순장 추가…' : activeCount ? '순장 변경…' : '순장 지정…'}</option>
+                {candidateGroups.map((g) => (
                     <optgroup key={g.group.id} label={g.group.name}>
-                      {choices.map((m) => (
+                      {g.members.map((m) => (
                       <option key={m.id} value={m.id}>{m.name}</option>
                       ))}
                     </optgroup>
-                  )
-                })}
+                ))}
               </select>
             </div>
           </div>
