@@ -1,0 +1,14 @@
+# Cloudflare Pages 응답 헤더.
+# vite 가 public/ 의 파일을 dist/ 최상단으로 복사하므로 배포 결과물 루트에 놓인다.
+#
+# <meta> CSP 로는 frame-ancestors 가 동작하지 않는다. 클릭재킹을 실제로 막는 것은
+# 아래 응답 헤더이고, main.jsx 의 iframe 가드는 보조 방어다.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cross-Origin-Opener-Policy: same-origin
