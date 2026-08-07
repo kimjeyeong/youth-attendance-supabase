@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { call } from '../api.js'
 
-export default function NewMember({ user, groups, isAdmin }) {
+export default function NewMember({ user, groups, isAdmin, canEditNames = false }) {
   const newbieGid = groups.find((g) => g.type === '새순')?.id
   const rookieGid = groups.find((g) => g.type === '새내기')?.id
 
@@ -21,6 +21,9 @@ export default function NewMember({ user, groups, isAdmin }) {
   const [newbies, setNewbies] = useState([])
   const [loadingNewbies, setLoadingNewbies] = useState(false)
   const [assigningId, setAssigningId] = useState(null)
+  const [editingId, setEditingId] = useState(null)
+  const [editingName, setEditingName] = useState('')
+  const [renamingId, setRenamingId] = useState(null)
   const 일반순 = groups.filter((g) => g.type === '일반')
 
   async function loadNewbies() {
@@ -63,6 +66,19 @@ export default function NewMember({ user, groups, isAdmin }) {
     } else { setMsgOk(false); setMsg('배정 실패: ' + (res.error || '알 수 없는 오류')) }
   }
 
+  async function rename(memberId) {
+    const nextName = editingName.trim()
+    if (!nextName) return
+    setRenamingId(memberId); setMsg('')
+    const res = await call('updateMemberName', { memberId, name: nextName })
+    setRenamingId(null)
+    if (res.ok) {
+      setMsgOk(true); setMsg(`${nextName} 이름 수정 완료`)
+      setEditingId(null); setEditingName('')
+      loadNewbies()
+    } else { setMsgOk(false); setMsg('이름 수정 실패: ' + (res.error || '알 수 없는 오류')) }
+  }
+
   return (
     <div className="board">
       <form className="card" onSubmit={register}>
@@ -95,8 +111,21 @@ export default function NewMember({ user, groups, isAdmin }) {
             <div className="list">
               {newbies.map((m) => (
                 <div key={m.id} className="row card assignrow">
-                  <div className="name">{m.name} <span className="tag new">{m.groupId}</span></div>
-                  <select className="input" value="" disabled={assigningId !== null} aria-label={`${m.name} 순 배정`} onChange={(e) => {
+                  <div className="newbie-name-actions">
+                    {editingId === m.id ? (
+                      <>
+                        <input className="input" aria-label={`${m.name} 이름 수정`} maxLength={50} disabled={renamingId !== null} value={editingName} onChange={(e) => setEditingName(e.target.value)} />
+                        <button type="button" className="minibtn" disabled={renamingId !== null || !editingName.trim()} onClick={() => rename(m.id)}>{renamingId === m.id ? '저장 중…' : '저장'}</button>
+                        <button type="button" className="minibtn" disabled={renamingId !== null} onClick={() => { setEditingId(null); setEditingName('') }}>취소</button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="name">{m.name} <span className="tag new">{m.groupId}</span></div>
+                        {canEditNames && <button type="button" className="minibtn" disabled={assigningId !== null || renamingId !== null} onClick={() => { setEditingId(m.id); setEditingName(m.name) }}>이름 수정</button>}
+                      </>
+                    )}
+                  </div>
+                  <select className="input" value="" disabled={assigningId !== null || renamingId !== null || editingId !== null} aria-label={`${m.name} 순 배정`} onChange={(e) => {
                     const selectedGroup = e.target.value
                     e.target.value = ''
                     assign(m.id, selectedGroup)

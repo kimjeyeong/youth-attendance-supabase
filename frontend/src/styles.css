@@ -135,6 +135,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .assignrow { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
 .assignrow .name { flex-shrink: 0; white-space: nowrap; }
 .assignrow .input { flex: 1; min-width: 0; margin-top: 0; max-width: 200px; }
+.newbie-name-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.newbie-name-actions .input { width: 150px; }
 
 /* 저장 바 (하단 고정) */
 .savebar {
@@ -261,6 +263,8 @@ h2 { font-size: 16px; line-height: 1.45; margin: 4px 0 10px; }
   /* 순장 관리: 지정 셀렉트와 해제 버튼이 겹치지 않게 */
   .assignrow { flex-direction: column; align-items: stretch; gap: 8px; }
   .assignrow .input { max-width: none; }
+  .newbie-name-actions { width: 100%; }
+  .newbie-name-actions .input { width: auto; }
   .leadertop { flex-direction: column; align-items: flex-start; gap: 4px; }
   .codebox { gap: 5px; }
   .codeval { flex: 1 1 100%; }

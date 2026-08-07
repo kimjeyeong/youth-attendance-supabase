@@ -133,6 +133,17 @@ export const mockApi = {
     members.push({ id, name: String(name).trim(), groupId: group.id, status: '신규자', note: type })
     return ok({ id, groupId: group.id })
   },
+  updateMemberName({ code, memberId, name }) {
+    const user = userFor(code)
+    if (!isOwner(user)) return fail('진짜 최고권한만 신규자 이름을 수정할 수 있습니다.')
+    const member = members.find((item) => String(item.id) === String(memberId) && item.status === '신규자')
+    const nextName = String(name || '').trim()
+    if (!member) return fail('배정 대기 중인 신규자를 찾을 수 없습니다.')
+    if (!nextName || nextName.length > 50) return fail('이름은 1~50자로 입력하세요.')
+    member.name = nextName
+    users.filter((item) => String(item.memberId) === String(member.id)).forEach((item) => { item.name = nextName })
+    return ok({ memberId: String(member.id), name: nextName })
+  },
   getAdmins({ code }) {
     const current = userFor(code)
     if (!isOwner(current)) return fail('진짜 최고권한만 권한을 관리할 수 있습니다.')

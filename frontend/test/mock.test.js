@@ -43,6 +43,20 @@ test('순장은 순장 지정 기능을 쓸 수 없다', async () => {
   assert.equal(set.ok, false)
 })
 
+test('진짜 최고권한만 배정 대기 신규자의 이름을 수정한다', async () => {
+  const denied = await mockApi.updateMemberName({ code: 'new-0000', memberId: 10, name: '수정 실패' })
+  assert.equal(denied.ok, false)
+
+  const updated = await mockApi.updateMemberName({ code: 'admin-1488', memberId: 10, name: '수정된 이름' })
+  assert.equal(updated.ok, true)
+
+  const list = await mockApi.getMembers({ code: 'admin-1488', groupId: 'S1' })
+  assert.equal(list.members.find((member) => String(member.id) === '10').name, '수정된 이름')
+
+  const settled = await mockApi.updateMemberName({ code: 'admin-1488', memberId: 5, name: '수정 불가' })
+  assert.equal(settled.ok, false)
+})
+
 test('최고권한은 개인별 최고권한을 초대하고 관리한다', async () => {
   const denied = await mockApi.createAdminInvitation({
     code: 'g2-5012',

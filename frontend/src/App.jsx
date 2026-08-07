@@ -166,7 +166,7 @@ export default function App() {
       <main>
         {activeTab === 'attendance' && <AttendanceBoard user={user} groups={groups} isAdmin={canViewAll} onDirtyChange={setAttendanceDirty} />}
         {activeTab === 'dashboard' && <Dashboard user={user} groups={groups} isAdmin={canViewAll} />}
-        {activeTab === 'new' && <NewMember user={user} groups={groups} isAdmin={canViewAll} />}
+        {activeTab === 'new' && <NewMember user={user} groups={groups} isAdmin={canViewAll} canEditNames={canManageAdmins} />}
         {activeTab === 'renewal' && <RenewalAdmin groups={groups} onDirtyChange={setRenewalDirty} />}
         {activeTab === 'admins' && <AdminManagement />}
       </main>

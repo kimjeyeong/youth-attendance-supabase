@@ -55,6 +55,16 @@ test('admin becomes the single protected emergency account', async () => {
   assert.match(sql, /to_regprocedure\('public\.attendance_audit\(text,uuid,text,text,boolean,jsonb\)'\)/i)
 })
 
+test('only the owner can rename a pending new member', async () => {
+  const sql = await readMigration('202608070010_update_new_member_name.sql')
+
+  assert.match(sql, /v_user\.permission_level <> 'owner'/i)
+  assert.match(sql, /where id = v_member_id and status = '신규자'/i)
+  assert.match(sql, /update public\.app_users[\s\S]*where member_id = v_member_id/i)
+  assert.match(sql, /'updateMemberName'/i)
+  assert.match(sql, /perform public\.attendance_audit/i)
+})
+
 test('internal database errors are not returned to the browser', async () => {
   const sql = await readMigration('202608070008_security_fixes.sql')
 
