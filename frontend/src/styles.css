@@ -307,6 +307,19 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .leaderactions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .leaderactions .input { margin-top: 0; flex: 1; min-width: 0; }
 
+/* ===== 최고권한 관리 ===== */
+.admin-invite h3 { margin: 0 0 8px; }
+.admin-form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.admin-form-grid label { color: var(--muted); font-size: 12px; }
+.admin-list { display: grid; grid-template-columns: 1fr 1fr; }
+.admin-card.inactive { opacity: .72; }
+.admin-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.admin-name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.admin-name-line .tag { margin-left: 0; }
+.admin-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+.admin-edit { display: grid; gap: 6px; margin-top: 10px; }
+.admin-edit .input { margin-top: 0; }
+
 /* ===== 순원·순장 리뉴얼 ===== */
 .renewal-tabs { margin-bottom: 2px; }
 .renewal-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -332,6 +345,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .renewactions .minibtn { min-height: 42px; }
 
 @media (max-width: 560px) {
+  .admin-form-grid, .admin-list { grid-template-columns: 1fr; }
   .renewal-filters { grid-template-columns: 1fr; }
   .renewal-template .sectionhead { flex-direction: column; align-items: stretch; }
   .template-download { width: 100%; }

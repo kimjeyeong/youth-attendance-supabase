@@ -43,6 +43,63 @@ test('순장은 순장 지정 기능을 쓸 수 없다', async () => {
   assert.equal(set.ok, false)
 })
 
+test('최고권한은 개인별 최고권한을 초대하고 관리한다', async () => {
+  const denied = await mockApi.createAdminInvitation({
+    code: 'g2-5012',
+    name: '권한없음',
+    positionTitle: '회장',
+  })
+  assert.equal(denied.ok, false)
+
+  const created = await mockApi.createAdminInvitation({
+    code: 'admin-1488',
+    name: '예시 회장',
+    positionTitle: '회장',
+    expiresOn: '2099-12-31',
+  })
+  assert.equal(created.ok, true)
+  assert.ok(created.code.startsWith('admin-'))
+
+  const list = await mockApi.getAdmins({ code: 'admin-1488' })
+  const invited = list.admins.find((admin) => admin.userId === created.userId)
+  assert.equal(invited.name, '예시 회장')
+  assert.equal(invited.positionTitle, '회장')
+  assert.equal(invited.accountLinked, false)
+
+  const updated = await mockApi.updateAdmin({
+    code: 'admin-1488',
+    userId: created.userId,
+    name: '예시 임원',
+    positionTitle: '총무',
+    expiresOn: '2099-11-30',
+  })
+  assert.equal(updated.ok, true)
+
+  const selfDeactivate = await mockApi.deactivateAdmin({ code: created.code, userId: created.userId })
+  assert.equal(selfDeactivate.ok, false)
+
+  const deactivated = await mockApi.deactivateAdmin({ code: 'admin-1488', userId: created.userId })
+  assert.equal(deactivated.ok, true)
+  assert.equal((await mockApi.login({ code: created.code })).ok, false)
+
+  const reactivated = await mockApi.reactivateAdmin({ code: 'admin-1488', userId: created.userId })
+  assert.equal(reactivated.ok, true)
+  assert.equal((await mockApi.login({ code: created.code })).ok, true)
+})
+
+test('비상용 admin 계정은 수정하거나 비활성화할 수 없다', async () => {
+  const updated = await mockApi.updateAdmin({
+    code: 'admin-1488',
+    userId: 'u5',
+    name: '변경 시도',
+    positionTitle: '회장',
+  })
+  assert.equal(updated.ok, false)
+
+  const deactivated = await mockApi.deactivateAdmin({ code: 'admin-1488', userId: 'u5' })
+  assert.equal(deactivated.ok, false)
+})
+
 test('순장을 지정하면 로그인 코드가 자동 발급되고 그 코드로 로그인된다', async () => {
   const before = await mockApi.login({ code: 'zzz-none' })
   assert.equal(before.ok, false)

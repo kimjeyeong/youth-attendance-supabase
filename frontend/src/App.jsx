@@ -9,6 +9,7 @@ import AttendanceBoard from './components/AttendanceBoard.jsx'
 import NewMember from './components/NewMember.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import RenewalAdmin from './components/RenewalAdmin.jsx'
+import AdminManagement from './components/AdminManagement.jsx'
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -119,7 +120,7 @@ export default function App() {
   const newbieGid = groups.find((g) => g.type === '새순')?.id
   const rookieGid = groups.find((g) => g.type === '새내기')?.id
   const canSeeNew = isAdmin || user.groupId === newbieGid || user.groupId === rookieGid
-  const allowed = { attendance: true, dashboard: true, new: canSeeNew, renewal: isAdmin }
+  const allowed = { attendance: true, dashboard: true, new: canSeeNew, renewal: isAdmin, admins: isAdmin }
   const activeTab = allowed[tab] ? tab : 'attendance'
 
   return (
@@ -128,7 +129,7 @@ export default function App() {
         <div>
           <div className="title">젊은이사역부 출석</div>
           <div className="subtitle">
-            {user.name} · {user.role}
+            {user.name} · {user.positionTitle ? `${user.positionTitle} · ` : ''}{user.role}
             {MOCK && <span className="badge">예시모드</span>}
           </div>
         </div>
@@ -152,6 +153,11 @@ export default function App() {
             리뉴얼
           </button>
         )}
+        {isAdmin && (
+          <button className={activeTab === 'admins' ? 'tab on' : 'tab'} onClick={() => changeTab('admins')}>
+            권한관리
+          </button>
+        )}
       </nav>
 
       <main>
@@ -159,6 +165,7 @@ export default function App() {
         {activeTab === 'dashboard' && <Dashboard user={user} groups={groups} isAdmin={isAdmin} />}
         {activeTab === 'new' && <NewMember user={user} groups={groups} isAdmin={isAdmin} />}
         {activeTab === 'renewal' && <RenewalAdmin groups={groups} onDirtyChange={setRenewalDirty} />}
+        {activeTab === 'admins' && <AdminManagement />}
       </main>
     </div>
   )
