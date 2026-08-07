@@ -2,6 +2,11 @@ import React, { useEffect, useState } from 'react'
 import { call } from '../api.js'
 
 const POSITION_SUGGESTIONS = ['양육팀장', '담당 목사', '회장', '부회장', '총무', '서기', '회계', '임원']
+const PERMISSION_OPTIONS = [
+  { value: 'owner', label: '진짜 최고권한' },
+  { value: 'executive', label: '운영진·목사' },
+  { value: 'discipleship', label: '양육팀' },
+]
 
 export default function AdminManagement() {
   const [admins, setAdmins] = useState([])
@@ -10,7 +15,7 @@ export default function AdminManagement() {
   const [message, setMessage] = useState('')
   const [messageOk, setMessageOk] = useState(true)
   const [revealed, setRevealed] = useState(() => new Set())
-  const [form, setForm] = useState({ name: '', positionTitle: '', expiresOn: '' })
+  const [form, setForm] = useState({ name: '', positionTitle: '', permissionLevel: 'executive', expiresOn: '' })
   const [editing, setEditing] = useState(null)
 
   async function load() {
@@ -39,9 +44,9 @@ export default function AdminManagement() {
     const result = await call('createAdminInvitation', form)
     setBusyId('')
     if (!result.ok) return notify(false, result.error || '초대 코드를 발급하지 못했습니다.')
-    setForm({ name: '', positionTitle: '', expiresOn: '' })
+    setForm({ name: '', positionTitle: '', permissionLevel: 'executive', expiresOn: '' })
     setRevealed((current) => new Set(current).add(result.userId))
-    notify(true, '최고권한 초대 코드를 발급했습니다. 본인에게만 전달하세요.')
+    notify(true, '관리 계정 초대 코드를 발급했습니다. 본인에게만 전달하세요.')
     await load()
   }
 
@@ -53,7 +58,7 @@ export default function AdminManagement() {
     setBusyId('')
     if (!result.ok) return notify(false, result.error || '정보를 수정하지 못했습니다.')
     setEditing(null)
-    notify(true, '최고권한 정보를 수정했습니다.')
+    notify(true, '관리 계정 정보를 수정했습니다.')
     await load()
   }
 
@@ -101,16 +106,16 @@ export default function AdminManagement() {
   return (
     <div className="board admin-management">
       <div className="card">
-        <h2>최고권한 관리</h2>
+        <h2>권한 관리</h2>
         <p className="muted small">
           각 담당자가 본인 이메일로 가입한 뒤 아래에서 발급한 일회용 코드를 입력합니다.
-          비상용 admin 계정과 개인별 최고권한 계정은 서로 분리됩니다.
+          진짜 최고권한만 이 화면을 볼 수 있으며, 직책과 실제 권한 등급은 별도로 지정됩니다.
         </p>
         {message && <div className={messageOk ? 'savemsg formmsg' : 'savemsg formmsg error'} role="status">{message}</div>}
       </div>
 
       <form className="card admin-invite" onSubmit={createInvitation}>
-        <h3>새 최고권한 초대</h3>
+        <h3>새 관리 계정 초대</h3>
         <div className="admin-form-grid">
           <label>
             <span>이름</span>
@@ -119,6 +124,12 @@ export default function AdminManagement() {
           <label>
             <span>직책</span>
             <input className="input" list="admin-position-options" value={form.positionTitle} onChange={(event) => updateForm('positionTitle', event.target.value)} placeholder="양육팀장, 담당 목사, 회장…" maxLength={50} required />
+          </label>
+          <label>
+            <span>권한 등급</span>
+            <select className="input" value={form.permissionLevel} onChange={(event) => updateForm('permissionLevel', event.target.value)}>
+              {PERMISSION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
           </label>
           <label>
             <span>임기 종료일 <small className="muted">(선택)</small></span>
@@ -143,6 +154,7 @@ export default function AdminManagement() {
                   <div className="admin-name-line">
                     <span className="name">{admin.name}</span>
                     <span className="tag linked">{admin.positionTitle || '직책 미지정'}</span>
+                    <span className="tag">{admin.permissionLabel || '운영진·목사'}</span>
                     {admin.protected && <span className="tag">비상용</span>}
                     {admin.isSelf && <span className="tag">내 계정</span>}
                     {admin.expired && <span className="tag new">임기 종료</span>}
@@ -166,6 +178,9 @@ export default function AdminManagement() {
                 <form className="admin-edit" onSubmit={saveEdit}>
                   <input className="input" aria-label="최고권한 이름 수정" value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} maxLength={50} required />
                   <input className="input" aria-label="최고권한 직책 수정" list="admin-position-options" value={editing.positionTitle} onChange={(event) => setEditing({ ...editing, positionTitle: event.target.value })} maxLength={50} required />
+                  <select className="input" aria-label="권한 등급 수정" value={editing.permissionLevel} onChange={(event) => setEditing({ ...editing, permissionLevel: event.target.value })}>
+                    {PERMISSION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
                   <input className="input" aria-label="최고권한 임기 종료일 수정" type="date" value={editing.expiresOn || ''} onChange={(event) => setEditing({ ...editing, expiresOn: event.target.value })} />
                   <div className="admin-actions">
                     <button className="minibtn" disabled={busy}>저장</button>
@@ -174,7 +189,7 @@ export default function AdminManagement() {
                 </form>
               ) : (
                 <div className="admin-actions">
-                  {!admin.protected && <button type="button" className="minibtn" disabled={busy} onClick={() => setEditing({ userId: admin.userId, name: admin.name, positionTitle: admin.positionTitle, expiresOn: admin.expiresOn || '' })}>정보 수정</button>}
+                  {!admin.protected && <button type="button" className="minibtn" disabled={busy} onClick={() => setEditing({ userId: admin.userId, name: admin.name, positionTitle: admin.positionTitle, permissionLevel: admin.permissionLevel || 'executive', expiresOn: admin.expiresOn || '' })}>정보 수정</button>}
                   {!admin.protected && (
                     <button type="button" className={admin.active ? 'minibtn danger' : 'minibtn'} disabled={busy || (admin.active && !canDeactivate)} onClick={() => changeActive(admin)}>
                       {admin.active ? '비활성화' : '다시 활성화'}

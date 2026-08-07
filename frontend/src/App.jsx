@@ -114,13 +114,16 @@ export default function App() {
   if (!user) return <Login onLogin={onLogin} onNeedsClaim={() => setNeedsClaim(true)} />
   if (mustChangePassword) return <PasswordRecovery required onComplete={() => setMustChangePassword(false)} />
 
-  const isAdmin = user.role === '최고권한'
+  const permissionLevel = user.permissionLevel || (user.role === '최고권한' ? 'owner' : 'leader')
+  const canViewAll = permissionLevel !== 'leader'
+  const canManageOperations = permissionLevel === 'owner' || permissionLevel === 'executive'
+  const canManageAdmins = permissionLevel === 'owner'
 
   // 신규자 등록 화면은 최고권한 + 새순/새내기순 순장만
   const newbieGid = groups.find((g) => g.type === '새순')?.id
   const rookieGid = groups.find((g) => g.type === '새내기')?.id
-  const canSeeNew = isAdmin || user.groupId === newbieGid || user.groupId === rookieGid
-  const allowed = { attendance: true, dashboard: true, new: canSeeNew, renewal: isAdmin, admins: isAdmin }
+  const canSeeNew = canViewAll || user.groupId === newbieGid || user.groupId === rookieGid
+  const allowed = { attendance: true, dashboard: true, new: canSeeNew, renewal: canManageOperations, admins: canManageAdmins }
   const activeTab = allowed[tab] ? tab : 'attendance'
 
   return (
@@ -129,7 +132,7 @@ export default function App() {
         <div>
           <div className="title">젊은이사역부 출석</div>
           <div className="subtitle">
-            {user.name} · {user.positionTitle ? `${user.positionTitle} · ` : ''}{user.role}
+            {user.name} · {user.positionTitle ? `${user.positionTitle} · ` : ''}{user.permissionLabel || user.role}
             {MOCK && <span className="badge">예시모드</span>}
           </div>
         </div>
@@ -148,12 +151,12 @@ export default function App() {
             신규자
           </button>
         )}
-        {isAdmin && (
+        {canManageOperations && (
           <button className={activeTab === 'renewal' ? 'tab on' : 'tab'} onClick={() => changeTab('renewal')}>
             리뉴얼
           </button>
         )}
-        {isAdmin && (
+        {canManageAdmins && (
           <button className={activeTab === 'admins' ? 'tab on' : 'tab'} onClick={() => changeTab('admins')}>
             권한관리
           </button>
@@ -161,9 +164,9 @@ export default function App() {
       </nav>
 
       <main>
-        {activeTab === 'attendance' && <AttendanceBoard user={user} groups={groups} isAdmin={isAdmin} onDirtyChange={setAttendanceDirty} />}
-        {activeTab === 'dashboard' && <Dashboard user={user} groups={groups} isAdmin={isAdmin} />}
-        {activeTab === 'new' && <NewMember user={user} groups={groups} isAdmin={isAdmin} />}
+        {activeTab === 'attendance' && <AttendanceBoard user={user} groups={groups} isAdmin={canViewAll} onDirtyChange={setAttendanceDirty} />}
+        {activeTab === 'dashboard' && <Dashboard user={user} groups={groups} isAdmin={canViewAll} />}
+        {activeTab === 'new' && <NewMember user={user} groups={groups} isAdmin={canViewAll} />}
         {activeTab === 'renewal' && <RenewalAdmin groups={groups} onDirtyChange={setRenewalDirty} />}
         {activeTab === 'admins' && <AdminManagement />}
       </main>

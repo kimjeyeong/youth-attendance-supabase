@@ -309,7 +309,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 /* ===== 최고권한 관리 ===== */
 .admin-invite h3 { margin: 0 0 8px; }
-.admin-form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.admin-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .admin-form-grid label { color: var(--muted); font-size: 12px; }
 .admin-list { display: grid; grid-template-columns: 1fr 1fr; }
 .admin-card.inactive { opacity: .72; }

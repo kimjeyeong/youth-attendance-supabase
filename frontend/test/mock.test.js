@@ -55,6 +55,7 @@ test('최고권한은 개인별 최고권한을 초대하고 관리한다', asyn
     code: 'admin-1488',
     name: '예시 회장',
     positionTitle: '회장',
+    permissionLevel: 'executive',
     expiresOn: '2099-12-31',
   })
   assert.equal(created.ok, true)
@@ -64,6 +65,7 @@ test('최고권한은 개인별 최고권한을 초대하고 관리한다', asyn
   const invited = list.admins.find((admin) => admin.userId === created.userId)
   assert.equal(invited.name, '예시 회장')
   assert.equal(invited.positionTitle, '회장')
+  assert.equal(invited.permissionLevel, 'executive')
   assert.equal(invited.accountLinked, false)
 
   const updated = await mockApi.updateAdmin({
@@ -71,6 +73,7 @@ test('최고권한은 개인별 최고권한을 초대하고 관리한다', asyn
     userId: created.userId,
     name: '예시 임원',
     positionTitle: '총무',
+    permissionLevel: 'executive',
     expiresOn: '2099-11-30',
   })
   assert.equal(updated.ok, true)
@@ -194,4 +197,31 @@ test('순원 리뉴얼은 현재 소속과 순이름만 바꾸고 과거 출석�
   const history = await mockApi.getAttendanceRange({ code: 'admin-1488', groupId: 'G1' })
   const oldRecord = history.records.find((record) => String(record.memberId) === '7')
   assert.equal(oldRecord.groupId, 'G2')
+})
+
+test('permission hierarchy restricts management actions', async () => {
+  const executive = await mockApi.createAdminInvitation({
+    code: 'admin-1488',
+    name: 'Executive User',
+    positionTitle: 'Pastor',
+    permissionLevel: 'executive',
+  })
+  assert.equal(executive.ok, true)
+  const executiveLogin = await mockApi.login({ code: executive.code })
+  assert.equal(executiveLogin.user.permissionLevel, 'executive')
+  assert.equal((await mockApi.getAdmins({ code: executive.code })).ok, false)
+  assert.equal((await mockApi.getLeaders({ code: executive.code })).ok, true)
+
+  const discipleship = await mockApi.createAdminInvitation({
+    code: 'admin-1488',
+    name: 'Discipleship User',
+    positionTitle: 'Team Lead',
+    permissionLevel: 'discipleship',
+  })
+  assert.equal(discipleship.ok, true)
+  const discipleshipLogin = await mockApi.login({ code: discipleship.code })
+  assert.equal(discipleshipLogin.user.permissionLevel, 'discipleship')
+  assert.equal((await mockApi.getAdmins({ code: discipleship.code })).ok, false)
+  assert.equal((await mockApi.getLeaders({ code: discipleship.code })).ok, false)
+  assert.equal((await mockApi.getMembers({ code: discipleship.code })).ok, true)
 })

@@ -11,7 +11,7 @@ const users = [
   { userId: 'u2', code: 'g2-5012', name: '소망순장', role: '순장', groupId: 'G2' },
   { userId: 'u3', code: 'new-0000', name: '새순순장', role: '순장', groupId: 'S1' },
   { userId: 'u4', code: 'rookie-0000', name: '새내기순장', role: '순장', groupId: 'S2' },
-  { userId: 'u5', code: 'admin-1488', name: '예시 관리자', role: '최고권한', groupId: '전체', positionTitle: '비상용 관리자', protected: true, accountLinked: true },
+  { userId: 'u5', code: 'admin-1488', name: '예시 관리자', role: '최고권한', groupId: '전체', positionTitle: '비상용 관리자', permissionLevel: 'owner', protected: true, accountLinked: true },
 ]
 
 const members = [
@@ -50,6 +50,12 @@ function fail(error) { return Promise.resolve({ ok: false, error }) }
 // 해제된(비활성) 계정은 로그인할 수 없다 — 백엔드 authUser 와 동일한 규칙
 function isExpired(user) { return Boolean(user.expiresOn && user.expiresOn < new Date().toISOString().slice(0, 10)) }
 function userFor(code) { return users.find((user) => user.code === code && user.active !== false && !isExpired(user)) }
+function permissionLevelFor(user) { return user?.permissionLevel || (user?.role === '최고권한' ? 'owner' : 'leader') }
+function permissionLabelFor(user) {
+  return { owner: '진짜 최고권한', executive: '운영진·목사', discipleship: '양육팀', leader: '순장' }[permissionLevelFor(user)]
+}
+function isOwner(user) { return permissionLevelFor(user) === 'owner' }
+function canManageOperations(user) { return ['owner', 'executive'].includes(permissionLevelFor(user)) }
 function scopeFor(user, groupId) { return user.role === '최고권한' ? (groupId || null) : user.groupId }
 function isMultiLeaderGroup(group) { return group && (group.type === '새순' || group.type === '새내기') }
 function leaderIdsFor(group) {
@@ -70,7 +76,7 @@ export const mockApi = {
   login({ code }) {
     const user = userFor(code)
     if (!user) return fail('코드가 올바르지 않습니다.')
-    return ok({ user: { name: user.name, role: user.role, groupId: user.groupId, positionTitle: user.positionTitle || '', expiresOn: user.expiresOn || '' }, groups })
+    return ok({ user: { name: user.name, role: user.role, groupId: user.groupId, positionTitle: user.positionTitle || '', permissionLevel: permissionLevelFor(user), permissionLabel: permissionLabelFor(user), expiresOn: user.expiresOn || '' }, groups })
   },
   getGroups({ code }) {
     if (!userFor(code)) return fail('유효하지 않은 액세스 코드입니다.')
@@ -129,12 +135,14 @@ export const mockApi = {
   },
   getAdmins({ code }) {
     const current = userFor(code)
-    if (!current || current.role !== '최고권한') return fail('최고권한만 최고권한 계정을 관리할 수 있습니다.')
+    if (!isOwner(current)) return fail('진짜 최고권한만 권한을 관리할 수 있습니다.')
     return ok({
       admins: users.filter((user) => user.role === '최고권한').map((user) => ({
         userId: user.userId,
         name: user.name,
         positionTitle: user.positionTitle || '',
+        permissionLevel: permissionLevelFor(user),
+        permissionLabel: permissionLabelFor(user),
         expiresOn: user.expiresOn || '',
         active: user.active !== false,
         expired: isExpired(user),
@@ -146,29 +154,32 @@ export const mockApi = {
       })),
     })
   },
-  createAdminInvitation({ code, name, positionTitle, expiresOn = '' }) {
+  createAdminInvitation({ code, name, positionTitle, permissionLevel = 'executive', expiresOn = '' }) {
     const current = userFor(code)
-    if (!current || current.role !== '최고권한') return fail('최고권한만 최고권한 계정을 관리할 수 있습니다.')
+    if (!isOwner(current)) return fail('진짜 최고권한만 권한을 관리할 수 있습니다.')
     if (String(name || '').trim().length < 2) return fail('이름은 2~50자로 입력하세요.')
     if (String(positionTitle || '').trim().length < 2) return fail('직책은 2~50자로 입력하세요.')
+    if (!['owner', 'executive', 'discipleship'].includes(permissionLevel)) return fail('권한 등급을 선택하세요.')
     const userId = `admin-${Math.random().toString(36).slice(2, 10)}`
     const inviteCode = `admin-${Math.random().toString(36).slice(2, 14)}`
-    users.push({ userId, code: inviteCode, name: name.trim(), role: '최고권한', groupId: '전체', positionTitle: positionTitle.trim(), expiresOn, active: true, accountLinked: false })
+    users.push({ userId, code: inviteCode, name: name.trim(), role: '최고권한', groupId: '전체', positionTitle: positionTitle.trim(), permissionLevel, expiresOn, active: true, accountLinked: false })
     return ok({ userId, code: inviteCode })
   },
-  updateAdmin({ code, userId, name, positionTitle, expiresOn = '' }) {
+  updateAdmin({ code, userId, name, positionTitle, permissionLevel, expiresOn = '' }) {
     const current = userFor(code)
-    if (!current || current.role !== '최고권한') return fail('최고권한만 최고권한 계정을 관리할 수 있습니다.')
+    if (!isOwner(current)) return fail('진짜 최고권한만 권한을 관리할 수 있습니다.')
     const target = users.find((user) => user.userId === userId && user.role === '최고권한')
     if (!target) return fail('해당 최고권한 계정을 찾을 수 없습니다.')
     if (target.protected) return fail('비상용 admin 계정은 수정할 수 없습니다.')
     if (String(name || '').trim().length < 2 || String(positionTitle || '').trim().length < 2) return fail('이름과 직책을 확인하세요.')
-    Object.assign(target, { name: name.trim(), positionTitle: positionTitle.trim(), expiresOn })
+    if (!['owner', 'executive', 'discipleship'].includes(permissionLevel)) return fail('권한 등급을 선택하세요.')
+    if (target.userId === current.userId && permissionLevel !== 'owner') return fail('현재 로그인한 자기 계정의 진짜 최고권한을 해제할 수 없습니다.')
+    Object.assign(target, { name: name.trim(), positionTitle: positionTitle.trim(), permissionLevel, expiresOn })
     return ok()
   },
   regenerateAdminCode({ code, userId }) {
     const current = userFor(code)
-    if (!current || current.role !== '최고권한') return fail('최고권한만 최고권한 계정을 관리할 수 있습니다.')
+    if (!isOwner(current)) return fail('진짜 최고권한만 권한을 관리할 수 있습니다.')
     const target = users.find((user) => user.userId === userId && user.role === '최고권한')
     if (!target) return fail('해당 최고권한 계정을 찾을 수 없습니다.')
     if (target.accountLinked) return fail('이미 이메일 계정이 연결됐습니다. 비밀번호 찾기를 사용하세요.')
@@ -178,7 +189,7 @@ export const mockApi = {
   },
   deactivateAdmin({ code, userId }) {
     const current = userFor(code)
-    if (!current || current.role !== '최고권한') return fail('최고권한만 최고권한 계정을 관리할 수 있습니다.')
+    if (!isOwner(current)) return fail('진짜 최고권한만 권한을 관리할 수 있습니다.')
     const target = users.find((user) => user.userId === userId && user.role === '최고권한')
     if (!target) return fail('해당 최고권한 계정을 찾을 수 없습니다.')
     if (target.protected) return fail('비상용 admin 계정은 비활성화할 수 없습니다.')
@@ -188,7 +199,7 @@ export const mockApi = {
   },
   reactivateAdmin({ code, userId }) {
     const current = userFor(code)
-    if (!current || current.role !== '최고권한') return fail('최고권한만 최고권한 계정을 관리할 수 있습니다.')
+    if (!isOwner(current)) return fail('진짜 최고권한만 권한을 관리할 수 있습니다.')
     const target = users.find((user) => user.userId === userId && user.role === '최고권한')
     if (!target) return fail('해당 최고권한 계정을 찾을 수 없습니다.')
     if (isExpired(target)) return fail('임기 종료일을 먼저 수정하세요.')
@@ -197,7 +208,7 @@ export const mockApi = {
   },
   getLeaders({ code }) {
     const user = userFor(code)
-    if (!user || user.role !== '최고권한') return fail('최고권한만 조회할 수 있습니다.')
+    if (!canManageOperations(user)) return fail('운영진·목사 이상 권한만 조회할 수 있습니다.')
     return ok({
       leaders: groups.map((group) => {
         const accounts = users.filter((item) => item.role === '순장' && item.groupId === group.id)
@@ -232,7 +243,7 @@ export const mockApi = {
   },
   setLeader({ code, groupId, memberId }) {
     const user = userFor(code)
-    if (!user || user.role !== '최고권한') return fail('최고권한만 순장을 지정할 수 있습니다.')
+    if (!canManageOperations(user)) return fail('운영진·목사 이상 권한만 순장을 지정할 수 있습니다.')
     const group = groups.find((item) => item.id === groupId)
     const member = members.find((item) => String(item.id) === String(memberId))
     if (!group) return fail('해당 순을 찾을 수 없습니다.')
@@ -260,7 +271,7 @@ export const mockApi = {
   },
   clearLeader({ code, groupId, memberId, userId }) {
     const user = userFor(code)
-    if (!user || user.role !== '최고권한') return fail('최고권한만 순장을 해제할 수 있습니다.')
+    if (!canManageOperations(user)) return fail('운영진·목사 이상 권한만 순장을 해제할 수 있습니다.')
     const group = groups.find((item) => item.id === groupId)
     if (!group) return fail('해당 순을 찾을 수 없습니다.')
     const accounts = users.filter((item) => item.role === '순장' && item.groupId === groupId)
@@ -278,7 +289,7 @@ export const mockApi = {
   },
   regenerateCode({ code, groupId, userId }) {
     const user = userFor(code)
-    if (!user || user.role !== '최고권한') return fail('최고권한만 코드를 재발급할 수 있습니다.')
+    if (!canManageOperations(user)) return fail('운영진·목사 이상 권한만 코드를 재발급할 수 있습니다.')
     const group = groups.find((item) => item.id === groupId)
     const accounts = users.filter((item) => item.role === '순장' && item.groupId === groupId)
     const account = isMultiLeaderGroup(group) ? accounts.find((item) => item.userId === userId) : accounts[0]
@@ -300,12 +311,12 @@ export const mockApi = {
   },
   syncMemberGroupNames({ code }) {
     const user = userFor(code)
-    if (!user || user.role !== '최고권한') return fail('최고권한만 순이름을 동기화할 수 있습니다.')
+    if (!canManageOperations(user)) return fail('운영진·목사 이상 권한만 순이름을 동기화할 수 있습니다.')
     return ok({ updated: members.length })
   },
   renewMembers({ code, assignments }) {
     const user = userFor(code)
-    if (!user || user.role !== '최고권한') return fail('최고권한만 순원을 재배정할 수 있습니다.')
+    if (!canManageOperations(user)) return fail('운영진·목사 이상 권한만 순원을 재배정할 수 있습니다.')
     if (!Array.isArray(assignments) || assignments.length === 0) return fail('변경할 순원을 선택하세요.')
     const seen = new Set()
     const changes = []
