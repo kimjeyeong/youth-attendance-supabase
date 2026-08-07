@@ -15,6 +15,7 @@ Supabase Dashboard의 **SQL Editor**에서 아래 파일을 순서대로 실행�
 7. `migrations/202608070006_permission_hierarchy.sql`
 8. `migrations/202608070007_security_hardening.sql`
 9. `migrations/202608070008_security_fixes.sql`
+10. `migrations/202608070009_consolidate_emergency_admin.sql`
 
 > `202608070008` 을 적용하면 **아직 사용하지 않은 연결 코드에 72시간 유효기간이 생깁니다.**
 > 적용 시점에 배포해 둔 코드가 있다면 72시간 안에 연결하거나, 지난 뒤에는

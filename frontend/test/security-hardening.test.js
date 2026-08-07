@@ -44,6 +44,17 @@ test('one-time claim codes expire and are checked fail-closed', async () => {
   assert.match(sql, /code_expires_at is not null[\s\S]{0,80}code_expires_at > now\(\)/i)
 })
 
+test('admin becomes the single protected emergency account', async () => {
+  const sql = await readMigration('202608070009_consolidate_emergency_admin.sql')
+
+  assert.match(sql, /set id = 'superadmin_retired',[\s\S]*active = false/i)
+  assert.match(sql, /set id = 'superadmin_emergency',[\s\S]*name = 'admin'/i)
+  assert.match(sql, /auth_user_id = v_emergency\.auth_user_id/i)
+  assert.match(sql, /position_title = '비상용 관리자'/i)
+  assert.match(sql, /permission_level = 'owner'/i)
+  assert.match(sql, /to_regprocedure\('public\.attendance_audit\(text,uuid,text,text,boolean,jsonb\)'\)/i)
+})
+
 test('internal database errors are not returned to the browser', async () => {
   const sql = await readMigration('202608070008_security_fixes.sql')
 
