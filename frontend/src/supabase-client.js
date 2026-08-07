@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { SUPABASE, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './config.js'
 import { authRedirectUrl } from './auth-url.js'
+import { loginEmail } from './login-identifier.js'
 
 export const supabase = SUPABASE
   ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
@@ -16,8 +17,8 @@ export function redirectUrl() {
   return authRedirectUrl(window.location.origin, import.meta.env.BASE_URL)
 }
 
-export async function signIn(email, password) {
-  return supabase.auth.signInWithPassword({ email: email.trim(), password })
+export async function signIn(identifier, password) {
+  return supabase.auth.signInWithPassword({ email: loginEmail(identifier), password })
 }
 
 export async function signUp(email, password) {

@@ -19,6 +19,7 @@ export default function App() {
   const [renewalDirty, setRenewalDirty] = useState(false)
   const [needsClaim, setNeedsClaim] = useState(false)
   const [recovering, setRecovering] = useState(false)
+  const [mustChangePassword, setMustChangePassword] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -29,6 +30,7 @@ export default function App() {
         setUser(null)
         setGroups([])
         setNeedsClaim(false)
+        setMustChangePassword(false)
         setBooting(false)
         return
       }
@@ -38,6 +40,7 @@ export default function App() {
         setUser(res.user)
         setGroups(res.groups || [])
         setNeedsClaim(false)
+        setMustChangePassword(Boolean(res.mustChangePassword))
       } else if (res.code === 'ACCOUNT_NOT_LINKED') {
         setUser(null)
         setNeedsClaim(true)
@@ -75,6 +78,7 @@ export default function App() {
   function onLogin(res) {
     setUser(res.user)
     setGroups(res.groups || [])
+    setMustChangePassword(Boolean(res.mustChangePassword))
   }
   async function logout() {
     if ((attendanceDirty || renewalDirty) && !window.confirm('저장하지 않은 변경사항이 있습니다. 로그아웃할까요?')) return
@@ -83,6 +87,7 @@ export default function App() {
     setUser(null)
     setGroups([])
     setNeedsClaim(false)
+    setMustChangePassword(false)
     setTab('attendance')
     setAttendanceDirty(false)
     setRenewalDirty(false)
@@ -106,6 +111,7 @@ export default function App() {
   if (recovering) return <PasswordRecovery onComplete={() => setRecovering(false)} />
   if (needsClaim) return <ClaimAccount onClaimed={onClaimed} onLogout={() => setNeedsClaim(false)} />
   if (!user) return <Login onLogin={onLogin} onNeedsClaim={() => setNeedsClaim(true)} />
+  if (mustChangePassword) return <PasswordRecovery required onComplete={() => setMustChangePassword(false)} />
 
   const isAdmin = user.role === '최고권한'
 
