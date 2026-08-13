@@ -41,3 +41,14 @@ test('CI는 명시적으로 요청한 경우에만 예시모드 빌드를 허용
     /두 값을 모두/,
   )
 })
+
+test('Cloudflare는 미리보기 브랜치만 예시모드 빌드를 허용한다', () => {
+  assert.doesNotThrow(() => validateBuildEnvironment({
+    CF_PAGES: '1',
+    CF_PAGES_BRANCH: 'feature/security-check',
+  }))
+  assert.throws(
+    () => validateBuildEnvironment({ CF_PAGES: '1', CF_PAGES_BRANCH: 'main' }),
+    /필요합니다/,
+  )
+})

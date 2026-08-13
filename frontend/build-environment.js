@@ -1,7 +1,10 @@
 export function validateBuildEnvironment(env) {
   const url = String(env.VITE_SUPABASE_URL || '').trim()
   const key = String(env.VITE_SUPABASE_PUBLISHABLE_KEY || '').trim()
-  const allowMock = env.VITE_ALLOW_MOCK_BUILD === 'true'
+  const cloudflarePreview = env.CF_PAGES === '1'
+    && Boolean(env.CF_PAGES_BRANCH)
+    && env.CF_PAGES_BRANCH !== 'main'
+  const allowMock = env.VITE_ALLOW_MOCK_BUILD === 'true' || cloudflarePreview
 
   if (!url && !key) {
     if (allowMock) return
