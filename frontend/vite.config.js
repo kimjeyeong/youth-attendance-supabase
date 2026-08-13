@@ -1,9 +1,15 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { validateBuildEnvironment } from './build-environment.js'
 
-// GitHub Pages 로 배포할 때는 base 를 '/저장소이름/' 으로 바꾸세요.
-// Vercel/Netlify 로 배포하면 base 는 '/' 그대로 두면 됩니다.
-export default defineConfig({
-  plugins: [react()],
-  base: process.env.VITE_BASE_PATH || '/',
+// Cloudflare Pages 루트 배포는 '/'를 사용한다. 하위 경로 배포가 필요할 때만
+// VITE_BASE_PATH를 명시한다.
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  if (command === 'build') validateBuildEnvironment(env)
+
+  return {
+    plugins: [react()],
+    base: env.VITE_BASE_PATH || '/',
+  }
 })

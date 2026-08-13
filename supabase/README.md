@@ -17,6 +17,7 @@ Supabase Dashboard의 **SQL Editor**에서 아래 파일을 순서대로 실행�
 9. `migrations/202608070008_security_fixes.sql`
 10. `migrations/202608070009_consolidate_emergency_admin.sql`
 11. `migrations/202608070010_update_new_member_name.sql`
+12. `migrations/202608130001_remove_audit_actor_names.sql`
 
 > `202608070008` 을 적용하면 **아직 사용하지 않은 연결 코드에 72시간 유효기간이 생깁니다.**
 > 적용 시점에 배포해 둔 코드가 있다면 72시간 안에 연결하거나, 지난 뒤에는
@@ -63,4 +64,4 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 - 초기 비밀번호 강제 변경은 auth 비밀번호 해시가 실제로 바뀐 것을 확인한 뒤에만 해제됩니다.
 - 예기치 못한 DB 오류의 원문은 Postgres 로그에만 남고 브라우저에는 일반 메시지만 갑니다.
 - 순장·권한·소속을 바꾸는 요청은 `admin_audit` 테이블에 성공·실패 모두 기록됩니다.
-  (식별자와 건수만 남기고 이름·전화번호는 남기지 않습니다. 조회는 SQL Editor 에서 합니다.)
+  (식별자와 건수만 남기고 이름·전화번호는 남기지 않습니다. `202608130001`은 과거 감사 로그의 운영자 이름도 삭제합니다. 조회는 SQL Editor 에서 합니다.)
