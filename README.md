@@ -88,7 +88,8 @@ GitHub Pages 배포는 응답 헤더를 붙일 수 없어 **의도적으로 쓰�
 이후 로그인과 비밀번호 재설정은 Supabase Auth가 처리합니다.
 
 > 환경변수는 빌드 시점에 번들로 주입됩니다. Supabase 설정이 없으면
-> **예시 데이터(예시모드)** 로 동작하니, 환경변수를 넣은 뒤 반드시 재배포하세요.
+> 개발 서버는 **예시 데이터(예시모드)** 로 동작합니다. 운영 빌드는 두 환경변수가
+> 모두 없거나 URL·키 형식이 잘못되면 실패하므로, 값을 넣은 뒤 재배포하세요.
 
 > Supabase → Authentication → URL Configuration 의 **Site URL** 과 **Redirect URLs** 에
 > 배포 주소(`https://youthcheck.pages.dev`)가 들어 있어야 이메일 인증·비밀번호 재설정 링크가 동작합니다.

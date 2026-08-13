@@ -17,6 +17,19 @@ test('리뉴얼 CSV는 한글 Excel 호환 BOM과 명확한 변경할 순 열을
   assert.match(csv, /1,"김,가",기쁨순,$/m)
 })
 
+test('리뉴얼 CSV의 운영 데이터는 Excel 수식으로 실행되지 않는다', () => {
+  const dangerousMembers = [
+    { id: 3, name: '=HYPERLINK("https://example.invalid")', groupId: 'G3' },
+    { id: 4, name: '  +SUM(1,1)', groupId: 'G3' },
+  ]
+  const dangerousGroups = [{ id: 'G3', name: '@악성순' }]
+
+  const csv = buildRenewalCsv(dangerousMembers, dangerousGroups)
+
+  assert.match(csv, /3,"'=HYPERLINK\(""https:\/\/example\.invalid""\)",'@악성순,$/m)
+  assert.match(csv, /4,"'  \+SUM\(1,1\)",'@악성순,$/m)
+})
+
 test('엑셀에서 붙여넣은 새 순이름과 순ID를 변경 대기로 변환한다', () => {
   const parsed = parseRenewalPaste(
     'member_id\t이름\t현재순\t변경할 순\n1\t김,가\t기쁨순\t소망순\n2\t이나\t소망순\tG1',

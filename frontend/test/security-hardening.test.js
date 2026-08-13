@@ -83,6 +83,18 @@ test('permission and roster changes are audited', async () => {
   }
 })
 
+test('audit records do not retain operator names', async () => {
+  const sql = await readMigration('202608130001_remove_audit_actor_names.sql')
+
+  assert.match(sql, /drop column if exists actor_name/i)
+  assert.match(
+    sql,
+    /insert into public\.admin_audit\(actor_user_id, actor_auth_id, action, ok, detail\)/i,
+  )
+  assert.doesNotMatch(sql, /insert into public\.admin_audit\([^)]*actor_name/i)
+  assert.match(sql, /revoke all on function public\.attendance_audit/i)
+})
+
 test('static deployments include a restrictive browser policy', async () => {
   const html = await readFile(new URL('frontend/index.html', root), 'utf8')
   // Cloudflare Pages 는 배포 결과물 루트의 _headers 를 읽는다.
@@ -122,6 +134,14 @@ test('no second, header-less copy of the app is published', async () => {
       `${file}: GitHub Pages 배포는 보안 헤더를 붙일 수 없으므로 쓰지 않는다`
     )
   }
+})
+
+test('CI third-party actions are pinned to immutable commits', async () => {
+  const yaml = await readFile(new URL('.github/workflows/ci.yml', root), 'utf8')
+  const refs = [...yaml.matchAll(/uses:\s*actions\/[\w-]+@([^\s]+)/g)].map((match) => match[1])
+
+  assert.ok(refs.length > 0)
+  refs.forEach((ref) => assert.match(ref, /^[0-9a-f]{40}$/i))
 })
 
 test('the app refuses to render inside a third-party frame', async () => {

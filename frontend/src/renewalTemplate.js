@@ -2,7 +2,10 @@ const HEADERS = ['member_id', '이름', '현재순', '변경할 순']
 const TARGET_HEADERS = ['변경할 순', '배정할 순', '리뉴얼 순', '리뉴얼순', '새순']
 
 function csvCell(value) {
-  const text = String(value ?? '')
+  let text = String(value ?? '')
+  // Excel은 CSV 셀이 =, +, -, @로 시작하면 수식으로 실행할 수 있다.
+  // 이름·순이름은 운영 데이터이므로 앞 공백 뒤의 수식 문자까지 텍스트로 고정한다.
+  if (/^[=+\-@]/.test(text.trimStart())) text = `'${text}`
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
 }
 
